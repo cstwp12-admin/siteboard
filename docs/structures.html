@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Structures and photos · SiteBoard</title>
+<meta name="description" content="SiteBoard: site reporting dashboard for Pan Borneo Sabah Phase 1B, Work Package 12.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23D9480F'/%3E%3Cpath d='M6 22h20M9 22V14m7 8V9m7 13v-6' stroke='white' stroke-width='3' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+:root{--bg:#F5F7F8;--surface:#FFFFFF;--sunk:#EDF0F2;--ink:#14212B;--muted:#596873;--line:#D3DAE0;--accent:#B93A0A;--accent2:#D9480F;--accent-soft:#FDEBDF;--side:#14212B;--side-ink:#E6ECF0;--side-muted:#97A5AF;--code:#EDF0F2;--shadow:0 1px 2px rgba(20,33,43,.06),0 8px 24px rgba(20,33,43,.07)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0E1418;--surface:#172027;--sunk:#121A20;--ink:#E6ECF0;--muted:#97A5AF;--line:#2A3640;--accent:#FF8A4D;--accent2:#FF7A33;--accent-soft:#3A2214;--side:#0A1014;--code:#1D2830;--shadow:none}}
+:root[data-theme=dark]{--bg:#0E1418;--surface:#172027;--sunk:#121A20;--ink:#E6ECF0;--muted:#97A5AF;--line:#2A3640;--accent:#FF8A4D;--accent2:#FF7A33;--accent-soft:#3A2214;--side:#0A1014;--code:#1D2830;--shadow:none}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:76px}
+body{margin:0;background:var(--bg);color:var(--ink);font:16.5px/1.65 Barlow,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;-webkit-text-size-adjust:100%}
+a{color:var(--accent);text-underline-offset:3px}a:hover{color:var(--accent2)}
+.top{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:12px;height:60px;padding:0 18px;background:var(--side);color:var(--side-ink);box-shadow:0 1px 0 rgba(255,255,255,.06)}
+.top .brand{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;font-weight:700;font-size:18px;letter-spacing:.2px}
+.plate{background:var(--accent2);color:#fff;font:600 13px "IBM Plex Mono",ui-monospace,monospace;padding:3px 8px;border-radius:5px}
+.top .ver{font:500 12px "IBM Plex Mono",ui-monospace,monospace;color:var(--side-muted)}
+.top .sp{flex:1}.bt{white-space:nowrap}
+.top input[type=search]{width:min(260px,34vw);height:36px;border-radius:9px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#fff;padding:0 12px;font:inherit;font-size:15px}
+.top input::placeholder{color:var(--side-muted)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;padding:9px 16px;font-weight:600;text-decoration:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);min-height:42px;cursor:pointer;font-size:15.5px}
+.btn.acc{background:var(--accent2);border-color:var(--accent2);color:#fff}.btn.acc:hover{background:var(--accent);color:#fff}
+.top .btn{min-height:36px;padding:6px 12px;font-size:16px;background:transparent;color:#fff;border-color:rgba(255,255,255,.25)}
+.top .btn.acc{background:var(--accent2);border-color:var(--accent2)}
+.menu{display:none}
+.layout{display:grid;grid-template-columns:260px minmax(0,1fr) 220px;max-width:1380px;margin:0 auto;gap:0}
+nav.side{position:sticky;top:60px;align-self:start;height:calc(100vh - 60px);overflow:auto;padding:22px 14px 40px 18px;border-right:1px solid var(--line)}
+nav.side .grp{font:600 12px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:2px 0 10px 10px}
+nav.side a.p{display:block;padding:8px 10px;border-radius:9px;color:var(--ink);text-decoration:none;font-weight:600}
+nav.side a.p:hover{background:var(--sunk)}
+nav.side a.p.on{background:var(--accent-soft);color:var(--accent)}
+nav.side ol{list-style:none;margin:2px 0 10px;padding:0 0 0 12px;border-left:2px solid var(--line);margin-left:14px}
+nav.side ol a{display:block;padding:4px 10px;color:var(--muted);text-decoration:none;font-size:14.5px;line-height:1.35;border-radius:6px}
+nav.side ol a:hover,nav.side ol a.on{color:var(--accent);background:var(--sunk)}
+main{padding:34px clamp(18px,4vw,52px) 70px;min-width:0}
+article{max-width:820px}
+article h1{font:700 40px/1.08 "Barlow Condensed",Barlow,sans-serif;text-transform:uppercase;letter-spacing:.3px;margin:0 0 6px}
+.lead{color:var(--muted);font-size:18px;margin:0 0 26px}
+article h2{font:700 27px/1.15 "Barlow Condensed",Barlow,sans-serif;text-transform:uppercase;letter-spacing:.4px;margin:44px 0 12px;padding-top:22px;border-top:1px solid var(--line)}
+article h2:first-of-type{border-top:0;padding-top:0;margin-top:30px}
+article h3{font-size:20px;margin:30px 0 8px}
+article h4{font-size:17px;margin:22px 0 6px}
+article p,article li{max-width:75ch}
+article img{max-width:100%;height:auto;border-radius:10px;border:1px solid var(--line);background:#fff;box-shadow:var(--shadow);margin:6px 0}
+article p>img+img{margin-left:8px}
+article code{font:500 .88em "IBM Plex Mono",ui-monospace,monospace;background:var(--code);padding:2px 6px;border-radius:5px}
+article pre{background:var(--code);padding:14px 16px;border-radius:10px;overflow:auto;border:1px solid var(--line)}article pre code{background:none;padding:0}
+article blockquote{margin:16px 0;padding:10px 16px;border-left:4px solid var(--accent2);background:var(--accent-soft);border-radius:0 10px 10px 0}
+article details{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:10px 14px;margin:12px 0}
+article summary{cursor:pointer;font-weight:600}
+.tw{overflow-x:auto;margin:14px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th{background:var(--sunk);text-align:left;font-weight:600;white-space:nowrap}
+th,td{padding:9px 13px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+aside.toc{position:sticky;top:60px;align-self:start;height:calc(100vh - 60px);overflow:auto;padding:34px 18px 40px 6px;font-size:14px}
+aside.toc b{display:block;font:600 12px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+aside.toc a{display:block;color:var(--muted);text-decoration:none;padding:4px 0 4px 12px;border-left:2px solid var(--line);line-height:1.35}
+aside.toc a:hover,aside.toc a.on{color:var(--accent);border-left-color:var(--accent2)}
+.hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:30px;align-items:center;background:linear-gradient(135deg,#14212B 0%,#1E3544 100%);color:#fff;border-radius:18px;padding:36px clamp(22px,4vw,44px);margin:0 0 30px;overflow:hidden;position:relative}
+.hero:before{content:"";position:absolute;left:0;top:0;bottom:0;width:8px;background:var(--accent2)}
+.hero .k{font:600 12.5px "IBM Plex Mono",ui-monospace,monospace;letter-spacing:2px;text-transform:uppercase;color:#F08A5D}
+.hero h1{color:#fff;font-size:clamp(34px,5vw,52px);margin:8px 0 10px}
+.hero p{color:#D7DEE3;font-size:18px;margin:0 0 22px;max-width:46ch}
+.hero .row{display:flex;gap:10px;flex-wrap:wrap}
+.hero .btn{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}.hero .btn.acc{background:var(--accent2);border-color:var(--accent2)}
+.hero img{width:190px;border-radius:22px;border:3px solid #0A1014;box-shadow:0 16px 40px rgba(0,0,0,.4);margin:0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:14px;margin:0 0 10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow)}
+.card b{display:block;font-size:17.5px;margin-bottom:4px}.card span{color:var(--muted);font-size:15px;line-height:1.45;display:block}
+.card .n{font:600 13px "IBM Plex Mono",ui-monospace,monospace;color:var(--accent2);margin-bottom:6px}
+.rel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:6px 22px 14px;margin:0 0 16px;box-shadow:var(--shadow)}
+.rel header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:6px}
+.rel h2{border:0!important;padding:14px 0 10px!important;margin:0!important;font-size:25px!important}
+.rel .date{color:var(--muted);font:500 13.5px "IBM Plex Mono",ui-monospace,monospace}
+.badge{background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:12px;padding:2px 9px;border-radius:999px;letter-spacing:.5px;text-transform:uppercase}
+.rel ul{padding-left:20px;margin:10px 0 0}.rel li{margin:0 0 9px;max-width:none}
+.pn{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:50px 0 0}
+.pn a{display:block;border:1px solid var(--line);border-radius:12px;padding:12px 16px;text-decoration:none;background:var(--surface)}
+.pn a small{display:block;color:var(--muted);font:500 12px "IBM Plex Mono",ui-monospace,monospace;text-transform:uppercase;letter-spacing:.6px}
+.pn a b{color:var(--ink)}.pn a:last-child{text-align:right}.pn a:hover{border-color:var(--accent2)}
+footer{border-top:1px solid var(--line);margin-top:44px;padding-top:18px;color:var(--muted);font-size:14.5px;display:flex;gap:14px;flex-wrap:wrap;justify-content:space-between}
+#res{position:absolute;right:18px;top:56px;width:min(420px,calc(100vw - 36px));background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 40px rgba(0,0,0,.25);max-height:70vh;overflow:auto;display:none}
+#res a{display:block;padding:10px 14px;text-decoration:none;color:var(--ink);border-bottom:1px solid var(--line)}#res a:last-child{border:0}#res a:hover{background:var(--sunk)}
+#res small{display:block;color:var(--muted)}#res b{color:var(--accent)}
+@media (max-width:1180px){.layout{grid-template-columns:250px minmax(0,1fr)}aside.toc{display:none}}
+@media (max-width:640px){.bt{display:none}}
+@media (max-width:860px){.layout{display:block}.menu{display:inline-flex}
+ nav.side{position:fixed;left:0;top:60px;bottom:0;width:min(310px,86vw);z-index:25;background:var(--bg);transform:translateX(-102%);transition:transform .2s,visibility .2s;visibility:hidden}
+ body.nav nav.side{transform:none;visibility:visible;box-shadow:0 0 40px rgba(0,0,0,.35)}
+ .hero{grid-template-columns:1fr}.hero img{display:none}.top .ver,.top .hide-s{display:none}.top input[type=search]{width:100%;min-width:0}.top .sp{display:none}#q{flex:1}
+ article h1{font-size:34px}.pn{grid-template-columns:1fr}}
+@media print{.top,nav.side,aside.toc,.pn,footer .no-print{display:none}.layout{display:block}body{background:#fff}}
+</style></head><body>
+<header class="top"><button class="btn menu" id="menu" type="button" aria-label="Menu">☰</button>
+<a class="brand" href="index.html"><span class="plate">WP12</span><span class="bt">SiteBoard</span></a><span class="ver">beta</span><span class="sp"></span>
+<input type="search" id="q" style="flex:0 1 auto" placeholder="Search  ( / )" aria-label="Search the documentation" autocomplete="off"><div id="res"></div>
+<button class="btn" id="theme" type="button" aria-label="Light or dark">◐</button><a class="btn acc hide-s" href="https://cstwp12-admin.github.io/siteboard/">Open the dashboard</a></header>
+<div class="layout"><nav class="side" aria-label="Pages"><div class="grp">Documentation</div><a class="p" href="index.html">Home</a><a class="p" href="team-guide.html">Team guide</a><a class="p on" href="structures.html">Structures and photos</a><ol><li><a href="#structure-board">Structure board</a></li><li><a href="#photo-gallery">Photo gallery</a></li></ol><a class="p" href="reports.html">Reports</a><a class="p" href="admin.html">Administrator notes</a><a class="p" href="ecosystem.html">Ecosystem and wider use</a><a class="p" href="changelog.html">What changed</a></nav>
+<main><article><h1 id="structures-and-photos">Structures and photos</h1>
+<h2 id="structure-board">Structure board</h2>
+<p>Lists the 4 bridges, 32 culverts, 13 junction culverts and 3 RS walls from the SDR <code>setup.json</code>, with state (<em>Active</em> in the last 7 days, <em>Recorded</em>, <em>No record</em>), last activity and status, number of records and photos.</p>
+<h3 id="how-a-work-item-is-matched-to-a-structure">How a work item is matched to a structure</h3>
+<ol>
+<li><strong>Assigned by you</strong> (see below).</li>
+<li><strong>Structure code</strong> written in the report (C12, JC3, B2, RSW1) – exact.</li>
+<li><strong>Description and chainage</strong> when no code is written. SiteBoard reads the type (box or pipe), size, side and river name from the text, then picks the nearest structure of that type. The chainage limit is wide because drawing chainages are indicative and culverts are moved or offset on site: about 150 m for culverts, 100 m for junction culverts, 120 m for RS walls and 250 m for bridges.</li>
+</ol>
+<p>Matches by description are marked <strong>(ch.)</strong>. <strong>(ch.?)</strong> means another structure is almost as close – check it.</p>
+<h3 id="correcting-the-board">Correcting the board</h3>
+<ul>
+<li>Click a structure → <strong>Actual chainage on site</strong> and a note (for example "relocated 45 m to suit stream"). The <em>Site CH</em> column then shows where the works were recorded against the drawing chainage.</li>
+<li>Under the table, <strong>Structure works not assigned</strong> lists culvert, bridge or wall works that matched nothing. Choose the structure, or <em>Not a listed structure</em>.</li>
+<li>Both are saved in <strong>Settings → Save settings to folder</strong>, so the whole team sees them.</li>
+</ul>
+<h3 id="updating-the-list">Updating the list</h3>
+<p>The SDR setup (version 7) is built in. After it changes, use Settings → <strong>Import SDR setup.json</strong>. The structure list and the SDR activity list (used to classify work categories) are replaced and shared with the team.</p>
+<h2 id="photo-gallery">Photo gallery</h2>
+<p>Filter by date, reporter, activity category, structure, zone, chainage range and text, or show only items with remarks. The large view shows the details, a link to the report, a GPS link (reports from SDR v1.2.6+) and a download button.</p><div class="pn"><a href="team-guide.html"><small>Previous</small><b>Team guide</b></a><a href="reports.html"><small>Next</small><b>Reports</b></a></div>
+<footer><span>Made by WPN.</span><span><a href="https://github.com/cstwp12-admin/siteboard">Repository</a> · <a href="https://cstwp12-admin.github.io/siteboard/">Open the dashboard</a> · <a href="https://cstwp12-admin.github.io/wp12-sdr/">SDR report app</a></span></footer></article></main>
+<aside class="toc"><b>On this page</b><a href="#structure-board">Structure board</a><a href="#photo-gallery">Photo gallery</a></aside></div>
+<script>(function(){
+var d=document,b=d.body,r=d.documentElement;
+try{var t=localStorage.getItem('sb-doc-theme');if(t)r.setAttribute('data-theme',t)}catch(e){}
+d.getElementById('theme').addEventListener('click',function(){var c=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'),n=c==='dark'?'light':'dark';r.setAttribute('data-theme',n);try{localStorage.setItem('sb-doc-theme',n)}catch(e){}});
+d.getElementById('menu').addEventListener('click',function(){b.classList.toggle('nav')});
+d.addEventListener('click',function(e){if(b.classList.contains('nav')&&!e.target.closest('nav.side,#menu'))b.classList.remove('nav');if(!e.target.closest('#res,#q'))d.getElementById('res').style.display='none'});
+var hs=[].slice.call(d.querySelectorAll('article h2[id],article h3[id]')),links=[].slice.call(d.querySelectorAll('aside.toc a,nav.side ol a'));
+function spy(){var y=scrollY+90,cur=null;hs.forEach(function(h){if(h.offsetTop<=y)cur=h.id});links.forEach(function(a){a.classList.toggle('on',cur&&a.getAttribute('href')==='#'+cur)})}
+addEventListener('scroll',spy,{passive:true});spy();
+var idx=null,q=d.getElementById('q'),res=d.getElementById('res');
+function load(c){if(idx)return c();fetch('search.json').then(function(r){return r.json()}).then(function(j){idx=j;c()}).catch(function(){})}
+function esc(s){return s.replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c]})}
+q.addEventListener('input',function(){var v=q.value.trim().toLowerCase();if(v.length<2){res.style.display='none';return}
+ load(function(){var w=v.split(/\s+/),hits=[];idx.forEach(function(s){var h=(s.t+' '+s.x).toLowerCase(),ok=w.every(function(k){return h.indexOf(k)>=0});if(ok){var sc=(s.t.toLowerCase().indexOf(v)>=0?10:0)+(s.t.toLowerCase().indexOf(w[0])>=0?5:0);hits.push([sc,s])}});
+ hits.sort(function(a,b){return b[0]-a[0]});
+ res.innerHTML=hits.length?hits.slice(0,10).map(function(h){var s=h[1],i=s.x.toLowerCase().indexOf(w[0]),sn=s.x.slice(Math.max(0,i-40),i+90);return '<a href="'+s.u+'"><b>'+esc(s.t)+'</b><small>'+esc(s.p)+' · '+esc(sn)+'</small></a>'}).join(''):'<a><small>Nothing found for "'+esc(v)+'".</small></a>';res.style.display='block'})});
+q.addEventListener('keydown',function(e){if(e.key==='Escape'){res.style.display='none';q.blur()}});
+addEventListener('keydown',function(e){if(e.key==='/'&&!/INPUT|TEXTAREA/.test((d.activeElement||{}).tagName||'')){e.preventDefault();q.focus()}});
+})();</script></body></html>
