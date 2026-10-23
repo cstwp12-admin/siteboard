@@ -10,6 +10,7 @@ import { makeGallery } from './gallery.js';
 import { makeToday } from './today.js';
 import { makeMessages } from './messages.js';
 import { makeSnapshot } from './snapshot.js';
+import { makeMap } from './map.js';
 import { importSetup, structuresList, DEFAULT_ACTMAP } from './structures.js';
 import { periodFor, defaultNo } from './report.js';
 import { buildModel, fileBase } from './model.js';
@@ -126,8 +127,8 @@ function renderFilters(){
 }
 
 // ------------------------------------------------------------------ views
-const IC={today:'<path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/>',overview:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',subs:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',acts:'<path d="M4 6h16M4 12h16M4 18h10"/>',chain:'<path d="M3 17l5-5 4 3 8-9"/><path d="M3 21h18"/>',struct:'<path d="M3 20h18M5 20V9l7-5 7 5v11M9 20v-6h6v6"/>',gal:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 9"/>',rfi:'<path d="M7 18a4 4 0 010-8 5 5 0 019.6-1A4 4 0 0117 18z"/>',obs:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>',msg:'<path d="M21 12a8 8 0 01-11.6 7.1L3 21l1.9-5.8A8 8 0 1121 12z"/><path d="M8.5 11h7M8.5 14h4"/>',gen:'<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M9 14h6M9 17h4"/>',reports:'<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',guide:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1-1.5 2M12 17h.01"/>',set:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'};
-const NAV=[['Monitor',[['today','Today'],['overview','Overview'],['subs','Submissions']]],['Site',[['acts','Activities'],['chain','Chainage & zones'],['struct','Structures'],['gal','Photos'],['rfi','RFI & weather'],['obs','Observations']]],['Reports',[['gen','Generate report'],['msg','Messages & memo'],['reports','Report files']]],['Help',[['guide','Guide'],['set','Settings']]]];
+const IC={map:'<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',today:'<path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/>',overview:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',subs:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',acts:'<path d="M4 6h16M4 12h16M4 18h10"/>',chain:'<path d="M3 17l5-5 4 3 8-9"/><path d="M3 21h18"/>',struct:'<path d="M3 20h18M5 20V9l7-5 7 5v11M9 20v-6h6v6"/>',gal:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 9"/>',rfi:'<path d="M7 18a4 4 0 010-8 5 5 0 019.6-1A4 4 0 0117 18z"/>',obs:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>',msg:'<path d="M21 12a8 8 0 01-11.6 7.1L3 21l1.9-5.8A8 8 0 1121 12z"/><path d="M8.5 11h7M8.5 14h4"/>',gen:'<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M9 14h6M9 17h4"/>',reports:'<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',guide:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1-1.5 2M12 17h.01"/>',set:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'};
+const NAV=[['Monitor',[['today','Today'],['overview','Overview'],['subs','Submissions']]],['Site',[['acts','Activities'],['chain','Chainage & zones'],['struct','Structures'],['gal','Photos'],['map','Map'],['rfi','RFI & weather'],['obs','Observations']]],['Reports',[['gen','Generate report'],['msg','Messages & memo'],['reports','Report files']]],['Help',[['guide','Guide'],['set','Settings']]]];
 const TABS=NAV.flatMap(g=>g[1]);
 function render(){
   A.setActivityMap((S.settings.setup&&S.settings.setup.actMap)||DEFAULT_ACTMAP);
@@ -140,7 +141,7 @@ function render(){
   $('#filters').style.display = ['set','gen','msg','reports','guide','obs','gal','struct','today'].includes(S.tab)?'none':'flex';
   const v=$('#view'); if(S.tab==='gen') drawPreview(); else { $('#paperWrap').style.display='none'; }
   if(!S.reports.length && S.tab!=='set'){ v.innerHTML=emptyView(); wireDrop(); return; }
-  ({overview:vOverview,subs:vSubs,acts:vActs,chain:vChain,rfi:vRfi,reports:vReports,gen:vGen,msg:MS.vMessages,set:vSet,obs:F.vObs,guide:F.vGuide,gal:GL.vGallery,struct:GL.vStructures,today:TD.vToday}[S.tab])(v);
+  ({overview:vOverview,subs:vSubs,acts:vActs,chain:vChain,rfi:vRfi,reports:vReports,gen:vGen,msg:MS.vMessages,set:vSet,obs:F.vObs,guide:F.vGuide,gal:GL.vGallery,map:MP.vMap,struct:GL.vStructures,today:TD.vToday}[S.tab])(v);
   wireCommon(v);
 }
 function emptyView(){
@@ -430,6 +431,7 @@ window.addEventListener('beforeprint',()=>closeDrawer());
 const GL=makeGallery({S,$,drawer,wireCommon,refLink,resolveRange,openReport,saveLS,render});
 const TD=makeToday({S,$,GL});
 const MS=makeMessages({S,$,drawer,closeDrawer,saveLS,refLink,wireCommon,openReport}); S.MS=MS;
+const MP=makeMap({S,$,drawer,resolveRange,inRange,MS,openReport,saveLS,render});
 const SN=makeSnapshot({S,$,drawer,resolveRange,inRange,MS,saveLS});
 const F=makeFeatures({S,$,render,drawer,closeDrawer,refLink,wireCommon,saveLS,refresh});
 $('#gs').oninput=(e)=>{ clearTimeout(F._t); F._t=setTimeout(()=>F.openSearch(e.target.value),250); };

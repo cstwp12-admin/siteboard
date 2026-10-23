@@ -96,3 +96,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+
+
+## Leaflet 1.9.4 (vendor/leaflet)
+BSD 2-Clause License. Copyright (c) 2010-2023, Volodymyr Agafonkin; (c) 2010-2011, CloudMade. See vendor/leaflet/LICENSE.
+
+## Map data and tiles (loaded at run time, not included)
+Basemap tiles are requested from OpenStreetMap (c) OpenStreetMap contributors, ODbL, and Esri World Imagery (Imagery (c) Esri, Maxar, Earthstar Geographics). Their terms of use apply. The project KMZ is loaded by the user and is never uploaded.

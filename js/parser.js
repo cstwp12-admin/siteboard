@@ -82,7 +82,7 @@ const isNoise=(s)=>MAP_NOISE.some(r=>r.test(s));
 
 function parseCards(page){
   const items=page.items;
-  if(!items.some(i=>i.s==='Status' && i.x<400)) return [];
+  if(!items.some(i=>(i.s==='Status'||i.s==='Location') && i.x<400)) return []; // no-activity photos carry no Status label
   const idx=items.filter(i=>/^\d{2}$/.test(i.s) && ((i.x>30&&i.x<45)||(i.x>300&&i.x<325)) && i.y>250 || /^\d{2}$/.test(i.s) && ((i.x>30&&i.x<45)||(i.x>300&&i.x<325)) && i.y<400);
   const seen=new Set(), cards=[];
   for(const ix of idx){

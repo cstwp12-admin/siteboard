@@ -197,5 +197,6 @@ export function makeMessages(ctx){
       useNo(M.no);
     }catch(e){ $('#memoMsg').textContent='Could not build memo: '+e.message; } };
   }
-  return { compose, composeForItem, composeForReport, vMessages, openPdf, logSent:addLog };
+  const attachToMemo=(f)=>{ const M=S.memo=S.memo||memoDefaults(); M.att.push({name:f.name,blob:f.blob}); };
+  return { compose, composeForItem, composeForReport, vMessages, openPdf, logSent:addLog, attachToMemo };
 }
