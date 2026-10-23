@@ -1,7 +1,7 @@
 // "Today" view: what a site team member or the RE wants to see first thing
 import * as A from './analysis.js';
 import { esc, catColor } from './charts.js';
-import { getPhoto } from './photos.js';
+import { loadInto } from './photos.js';
 import { CAT_ORDER, IDLE } from './config.js';
 
 export function makeToday(ctx){
@@ -26,7 +26,7 @@ export function makeToday(ctx){
     <div class="card"><h2>Reporting</h2><div class="sub">Expected daily reporters first</div>${mx.rows.map(r=>`<div style="display:flex;gap:8px;align-items:center;padding:3px 0"><span class="badge ${r.cells[0].rs.length?'ok':r.p.expected?'warn':''}">${r.cells[0].rs.length?'in':r.p.expected?'missing':'—'}</span>${esc(r.p.name)} <span class="sub">${esc(r.p.role||'')}</span></div>`).join('')||'<p class="empty">No reports.</p>'}</div></div>
     ${photos.length?`<div class="card" style="margin-top:12px"><h2>Photos</h2><div class="sub">${photos.length} from ${esc(A.fmtShort(d))}. Tap one to enlarge.</div><div class="strip-ph" id="tp">${photos.slice(0,18).map((p,i)=>`<img alt="" data-i="${i}">`).join('')}</div></div>`:''}`;
     const list=photos.slice(0,18);
-    v.querySelectorAll('#tp img').forEach(im=>{ const p=list[+im.dataset.i]; getPhoto(p.r,p.it).then(u=>{ if(u) im.src=u; }).catch(()=>{}); im.onclick=()=>GL.lightbox(+im.dataset.i,list); });
+    v.querySelectorAll('#tp img').forEach(im=>{ const p=list[+im.dataset.i]; loadInto(im,p.r,p.it); im.onclick=()=>GL.lightbox(+im.dataset.i,list); });
   }
   return { vToday };
 }

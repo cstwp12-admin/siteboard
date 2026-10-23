@@ -8,7 +8,7 @@ import re, glob, json, html, os, markdown
 APP_URL  = 'https://cstwp12-admin.github.io/siteboard/'      # the dashboard
 REPO_URL = 'https://github.com/cstwp12-admin/siteboard'
 SDR_URL  = 'https://cstwp12-admin.github.io/wp12-sdr/'
-VERSION  = 'beta'
+VERSION  = 'v0.6.0'
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
 CSS = open(os.path.join(HERE, 'docs.css'), encoding='utf-8').read()
 
@@ -84,7 +84,7 @@ def page_html(i, p):
 <button class="btn" id="theme" type="button" aria-label="Light or dark">◐</button><a class="btn acc hide-s" href="{APP_URL}">Open the dashboard</a></header>
 <div class="layout"><nav class="side" aria-label="Pages"><div class="grp">Documentation</div>{side}</nav>
 <main><article>{p['html']}{pn}
-<footer><span>Made by WPN.</span><span><a href="{REPO_URL}">Repository</a> · <a href="{APP_URL}">Open the dashboard</a> · <a href="{SDR_URL}">SDR report app</a></span></footer></article></main>
+<footer><span>SiteBoard {VERSION} · © 2026 WPN · <a href="{REPO_URL}/blob/main/LICENSE">MIT licence</a> · <a href="{REPO_URL}/blob/main/THIRD_PARTY_NOTICES.md">Third-party notices</a></span><span><a href="{REPO_URL}">Repository</a> · <a href="{APP_URL}">Open the dashboard</a> · <a href="{SDR_URL}">SDR report app</a></span></footer></article></main>
 <aside class="toc"><b>On this page</b>{toc}</aside></div>
 <script>{JS}</script></body></html>'''
 

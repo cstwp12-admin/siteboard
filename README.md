@@ -29,10 +29,15 @@ Project details, who must report daily, non-working days and observation follow-
 Activity categories (keyword rules), project text, rain keywords, working days, auto-refresh interval.
 
 ## Tests done
-Parsed 43 real reports (0 errors), tidy/move on a test folder, shared-settings round-trip, Excel export, report print layout.
+Parsed 43 real reports (0 errors), tidy/move on a test folder, shared-settings round-trip, Excel export, report PDF/Word build, memo, message composer.
 
 ## Features added in Phases 3–5
 - **Today**: the latest report day at a glance. **Photos**: gallery with filters, large view, GPS link, download, cached thumbnails. **Structures**: status board matched by code, then description + nearest chainage (culverts are moved on site); set actual chainages and assign unmatched works; both are shared through the settings file.
 - **Settings**: import the SDR `setup.json` (structures and activity list), report cover logo, QR codes for the two apps.
 - Left sidebar layout; phone-friendly for viewing.
 - How SiteBoard and the SDR app divide the work, contractor use and a project dashboard: `docs-src/ecosystem.md`.
+
+## Version, licence and credits
+- Version **v0.6.0** (previous release v0.5). The version is set in `js/config.js` (`VERSION`) and `tools/build_docs.py`; update both for each release and add a line to `docs-src/changelog.md`.
+- Licence: MIT, see `LICENSE`. Third-party components and their licences: `THIRD_PARTY_NOTICES.md`.
+- Copyright © 2026 WPN (MIT).

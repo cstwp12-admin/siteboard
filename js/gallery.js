@@ -2,7 +2,7 @@
 import * as A from './analysis.js';
 import { CAT_ORDER } from './config.js';
 import { esc, catColor } from './charts.js';
-import { getPhoto, getPhotoLarge, extractReport } from './photos.js';
+import { getPhoto, getPhotoLarge, extractReport, loadInto } from './photos.js';
 import { structuresList, matchStructures, GROUPS } from './structures.js';
 import { fmtCh } from './parser.js';
 
@@ -35,7 +35,7 @@ export function makeGallery(ctx){
   let io=null;
   function lazy(root){
     if(io) io.disconnect();
-    io=new IntersectionObserver((es)=>{ for(const e of es) if(e.isIntersecting){ io.unobserve(e.target); const i=+e.target.dataset.i; const p=G.list[i]; if(!p) continue; getPhoto(p.r,p.it).then(u=>{ if(u) e.target.src=u; }).catch(()=>{}); } },{rootMargin:'300px'});
+    io=new IntersectionObserver((es)=>{ for(const e of es) if(e.isIntersecting){ io.unobserve(e.target); const i=+e.target.dataset.i; const p=G.list[i]; if(!p) continue; loadInto(e.target,p.r,p.it); } },{rootMargin:'300px'});
     root.querySelectorAll('img[data-i]').forEach(im=>io.observe(im));
   }
 
@@ -76,7 +76,7 @@ export function makeGallery(ctx){
   async function prefetch(all){
     const b=$('#gAll'); const todo=G.list.length?G.list:all; const reps=[...new Set(todo.map(p=>p.r))]; let done=0; b.disabled=true;
     for(const r of reps){ b.textContent=`Preparing… ${done}/${reps.length} reports`; try{ await extractReport(r); }catch(_){} done++; }
-    b.textContent='Thumbnails ready ✓'; setTimeout(()=>{ b.disabled=false; b.textContent='Prepare all thumbnails'; },2500); document.querySelectorAll('img[data-i]').forEach(im=>{ const p=G.list[+im.dataset.i]; if(p&&!im.src) getPhoto(p.r,p.it).then(u=>{ if(u) im.src=u; }); });
+    b.textContent='Thumbnails ready ✓'; setTimeout(()=>{ b.disabled=false; b.textContent='Prepare all thumbnails'; },2500); document.querySelectorAll('img[data-i]').forEach(im=>{ const p=G.list[+im.dataset.i]; if(p&&!im.src) loadInto(im,p.r,p.it); });
   }
 
   // ---------------- lightbox
@@ -145,7 +145,7 @@ export function makeGallery(ctx){
     wireCommon($('#drawer'));
     const lst=withPh.slice(0,24).map(x=>({r:x.report,it:x.item,date:x.date,cat:catOf(x.item),codes:[]}));
     $('#drawer').querySelectorAll('.gp').forEach(d=>d.onclick=()=>lightbox(+d.dataset.k,lst));
-    $('#drawer').querySelectorAll('img[data-k]').forEach(im=>{ const p=lst[+im.dataset.k]; getPhoto(p.r,p.it).then(u=>{ if(u) im.src=u; }).catch(()=>{}); });
+    $('#drawer').querySelectorAll('img[data-k]').forEach(im=>{ const p=lst[+im.dataset.k]; loadInto(im,p.r,p.it); });
     const ov=()=>S.settings.structOverride=S.settings.structOverride||{};
     $('#oS').onclick=()=>{ const c=chNum($('#oC').value); const n=$('#oN').value.trim(); if(c==null&&!n){ delete ov()[r.s.id]; } else ov()[r.s.id]={...(c!=null?{ch:c}:{}),note:n}; saveLS(); render(); document.getElementById('dx')&&document.getElementById('dx').click(); };
     $('#oR').onclick=()=>{ delete ov()[r.s.id]; saveLS(); render(); document.getElementById('dx')&&document.getElementById('dx').click(); };

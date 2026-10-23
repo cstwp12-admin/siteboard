@@ -7,9 +7,17 @@ nav_order: 4
 
 1. Choose *Weekly* or *Monthly* and the period.
 2. Fill in the report number, prepared / checked names and the planned works.
-3. Choose the photos (or let SiteBoard pick) and press **Build**.
-4. Press **Print / Save as PDF** and choose *Save as PDF* in the browser dialog. Keep *Background graphics* on.
+3. Choose the photos (or let SiteBoard pick) and press **Build report**.
+4. Check the preview, then **Download PDF**, **Download Word**, **Open in new tab** or **Send via WhatsApp**.
+
+The PDF is made directly by SiteBoard, so it has a proper file name (for example `CST-WSR-2026-W43 Weekly Site Progress Report (19-25 Oct 2026).pdf`), fixed A4 margins, page numbers in the footer and a header on every page. Photos are placed at their original resolution from the SDR PDF. The Word file has the same content and can be edited before it is issued.
 
 A **logo** can be added to the cover in Settings. The report is generated on your computer; nothing is uploaded.
 
 *Export Excel* (top of most pages) saves the period's activities, submissions, RFIs, weather and observations as a workbook.
+
+## Opening, commenting and sending
+- In *Report files*, click a report reference, then **Open PDF** to read the original SDR PDF in a browser tab straight from your folder.
+- **Comment / send via WhatsApp** (same panel), the **Comment…** button on each item and **Send…** in *Observations* open the message composer with the details filled in.
+- *Messages & memo* holds the composer for Monitoring, Observation, Action needed, Follow-up and General messages, the internal memo designer, and a record of what was sent.
+- On a phone the file goes straight into WhatsApp. On a computer WhatsApp cannot receive a file from a web page, so SiteBoard downloads the file and opens WhatsApp; attach it with the paperclip.

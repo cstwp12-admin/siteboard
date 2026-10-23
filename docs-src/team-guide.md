@@ -21,7 +21,7 @@ One page for everyone who uses the dashboard.
 
 ## 3. Opening the dashboard (every team member)
 
-- Use **Chrome or Edge on a computer**. Phones can view but cannot connect a folder.
+- Use **Chrome, Edge or Brave on a computer**. Phones can view but cannot connect a folder. In **Brave**, first open `brave://flags/#file-system-access-api`, set it to *Enabled* and relaunch (Brave turns folder access off by default).
 - Install **Google Drive for desktop**, open its preferences and choose **Mirror files** so the folder is fully on your PC. Right-click the shared folder and make sure it is available offline.
 - Open the SiteBoard link and press **Connect reports folder**. Choose the shared Drive folder (for example `G:\My Drive\WP12\CST_Daily_Reports`). Press **Allow**.
 - Keep the tab open: it checks the folder every 20 seconds. Next time, press **Reconnect folder** once.
@@ -48,3 +48,8 @@ Project details, who must report daily, non-working days and observation follow-
 
 ## 8. Today view
 Open *Today* first thing: who has reported, what was done, which structures were worked and the day's photos. It shows the latest report day if nothing has come in yet today.
+
+## 8. Reports, comments and memos
+- **Generate report** builds the PDF; download it as PDF or Word, or send it by WhatsApp.
+- In **Report files**, open a report and press **Open PDF** to read the original, or **Comment / send via WhatsApp**.
+- **Messages & memo**: send Monitoring, Observation, Action needed or Follow-up messages, design an internal memo (PDF plus WhatsApp announcement) and see what was sent.

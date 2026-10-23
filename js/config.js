@@ -1,3 +1,5 @@
+export const VERSION = '0.6.0';
+export const CREDIT = '© 2026 WPN';
 // Edit this file to tune categories and defaults. No build step needed.
 export const PROJECT = {
   title: 'PROJEK LEBUHRAYA PAN BORNEO SABAH FASA 1B',

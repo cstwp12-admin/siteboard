@@ -2,19 +2,21 @@
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SiteBoard</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f5fae'/%3E%3Cpath d='M6 22h20M9 22V14m7 8V9m7 13v-6' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23D9480F'/%3E%3Cpath d='M6 22h20M9 22V14m7 8V9m7 13v-6' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="css/style.css">
 </head><body>
 <div class="shell">
 <aside class="side" id="side">
   <div class="brand"><svg viewBox="0 0 32 32" width="28" height="28"><rect width="32" height="32" rx="7" fill="var(--accent)"/><path d="M6 22h20M9 22V14m7 8V9m7 13v-6" stroke="var(--accent-ink)" stroke-width="3" stroke-linecap="round" fill="none"/></svg><div><b>SiteBoard</b><span id="proj">Site daily reports</span></div></div>
   <nav id="tabs"></nav>
-  <div class="side-foot"><div id="stat"></div><div class="links"><a class="lnk" href="docs/" target="_blank" rel="noopener">Guide &amp; documentation ↗</a><br><a class="lnk" id="sdrLink" href="https://cstwp12-admin.github.io/wp12-sdr/" target="_blank" rel="noopener">Open SDR report app ↗</a></div></div>
+  <div class="side-foot"><div id="stat"></div><div class="links"><a class="lnk" href="docs/" target="_blank" rel="noopener">Guide &amp; documentation ↗</a><br><a class="lnk" id="sdrLink" href="https://cstwp12-admin.github.io/wp12-sdr/" target="_blank" rel="noopener">Open SDR report app ↗</a><br><span class="ver" id="verTag"></span></div></div>
 </aside>
 <div class="content">
   <header class="top"><div class="top-in"><button class="btn menu" id="menu" aria-label="Menu">☰</button><div class="ttl"><h1 id="ptitle">Overview</h1><div id="pmeta" class="sub"></div></div><div class="sp"></div><input id="gs" type="search" placeholder="Search all reports…"><button class="btn" id="thm" title="Switch light / dark theme">Theme</button></div><div class="progress" id="prog" style="visibility:hidden"><i></i></div></header>
   <div class="filters" id="filters"></div>
-  <main><div id="view"></div><div id="paperWrap"><div class="no-print" style="max-width:210mm;margin:0 auto 8px;display:flex;gap:8px;align-items:center"><b>Report preview</b><span class="sp"></span><button class="btn pri" onclick="document.getElementById('gPrint').click()">Print / Save as PDF</button></div><div id="paper"></div></div></main>
+  <main><div id="view"></div><div id="paperWrap"></div></main>
 </div></div>
 <div class="nav-bg" id="navbg"></div>
 <div class="tip" id="tip"></div><div class="drawer-bg" id="dbg"></div><div class="drawer" id="drawer"></div>

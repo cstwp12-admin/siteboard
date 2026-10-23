@@ -1,15 +1,19 @@
-import { PROJECT, CAT_ORDER, DEFAULTS, CATS } from './config.js';
+import { PROJECT, CAT_ORDER, DEFAULTS, CATS, VERSION, CREDIT } from './config.js';
 import * as A from './analysis.js';
 import { esc, cssCatVars, catColor, legend, hbar, dayColumns, strip } from './charts.js';
 import { dbGet, dbPut, dbAll, dbClear } from './db.js';
 import { sync, listHandle, listFileObjects, fileIndex } from './scanner.js';
 import { makeFeatures } from './features.js';
 import { exportWorkbook } from './export.js';
-import { getPhoto, extractReport } from './photos.js';
+import { getPhoto, getFull, extractReport, loadInto } from './photos.js';
 import { makeGallery } from './gallery.js';
 import { makeToday } from './today.js';
+import { makeMessages } from './messages.js';
 import { importSetup, structuresList, DEFAULT_ACTMAP } from './structures.js';
-import { buildReport, periodFor, defaultNo } from './report.js';
+import { periodFor, defaultNo } from './report.js';
+import { buildModel, fileBase } from './model.js';
+import { renderPdf } from './render-pdf.js';
+import { renderDocx } from './render-docx.js';
 
 const $=(s,r=document)=>r.querySelector(s);
 const today=()=>A.iso(new Date());
@@ -24,7 +28,7 @@ const S={ reportsAll:[], allParsed:[], entries:[], reports:[], errors:[], dirHan
   gen:{type:'weekly',anchor:'',form:{},cands:[],sel:new Set(),loaded:false}, act:{q:'',cat:'',status:'',all:false} };
 const SDR_URL='https://cstwp12-admin.github.io/wp12-sdr/';
 const loadQR=()=>window.qrcode?Promise.resolve(window.qrcode):new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='vendor/qrcode.js'; sc.onload=()=>res(window.qrcode); sc.onerror=rej; document.head.appendChild(sc); });
-const HAS_FS = typeof window.showDirectoryPicker==='function';
+import { HAS_FS, fsNotice } from './browser.js';
 
 // ------------------------------------------------------------------ range
 function bounds(){ const ds=S.reports.map(r=>r.date).sort(); return { min:ds[0]||today(), max:ds.at(-1)||today() }; }
@@ -121,8 +125,8 @@ function renderFilters(){
 }
 
 // ------------------------------------------------------------------ views
-const IC={today:'<path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/>',overview:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',subs:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',acts:'<path d="M4 6h16M4 12h16M4 18h10"/>',chain:'<path d="M3 17l5-5 4 3 8-9"/><path d="M3 21h18"/>',struct:'<path d="M3 20h18M5 20V9l7-5 7 5v11M9 20v-6h6v6"/>',gal:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 9"/>',rfi:'<path d="M7 18a4 4 0 010-8 5 5 0 019.6-1A4 4 0 0117 18z"/>',obs:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>',gen:'<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M9 14h6M9 17h4"/>',reports:'<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',guide:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1-1.5 2M12 17h.01"/>',set:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'};
-const NAV=[['Monitor',[['today','Today'],['overview','Overview'],['subs','Submissions']]],['Site',[['acts','Activities'],['chain','Chainage & zones'],['struct','Structures'],['gal','Photos'],['rfi','RFI & weather'],['obs','Observations']]],['Reports',[['gen','Generate report'],['reports','Report files']]],['Help',[['guide','Guide'],['set','Settings']]]];
+const IC={today:'<path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/>',overview:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',subs:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',acts:'<path d="M4 6h16M4 12h16M4 18h10"/>',chain:'<path d="M3 17l5-5 4 3 8-9"/><path d="M3 21h18"/>',struct:'<path d="M3 20h18M5 20V9l7-5 7 5v11M9 20v-6h6v6"/>',gal:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 9"/>',rfi:'<path d="M7 18a4 4 0 010-8 5 5 0 019.6-1A4 4 0 0117 18z"/>',obs:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>',msg:'<path d="M21 12a8 8 0 01-11.6 7.1L3 21l1.9-5.8A8 8 0 1121 12z"/><path d="M8.5 11h7M8.5 14h4"/>',gen:'<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M9 14h6M9 17h4"/>',reports:'<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',guide:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1-1.5 2M12 17h.01"/>',set:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'};
+const NAV=[['Monitor',[['today','Today'],['overview','Overview'],['subs','Submissions']]],['Site',[['acts','Activities'],['chain','Chainage & zones'],['struct','Structures'],['gal','Photos'],['rfi','RFI & weather'],['obs','Observations']]],['Reports',[['gen','Generate report'],['msg','Messages & memo'],['reports','Report files']]],['Help',[['guide','Guide'],['set','Settings']]]];
 const TABS=NAV.flatMap(g=>g[1]);
 function render(){
   A.setActivityMap((S.settings.setup&&S.settings.setup.actMap)||DEFAULT_ACTMAP);
@@ -132,16 +136,16 @@ function render(){
   $('#ptitle').textContent=(TABS.find(t=>t[0]===S.tab)||[])[1]||'';
   { const ds=S.reports.map(r=>r.date).sort(); $('#pmeta').textContent=ds.length?`${S.reports.length} reports · ${A.fmtShort(ds[0])} – ${A.fmtDate(ds.at(-1))}${S.status.at?' · updated '+new Date(S.status.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):''}`:'No reports loaded'; }
   renderTop(); renderFilters();
-  $('#filters').style.display = ['set','gen','reports','guide','obs','gal','struct','today'].includes(S.tab)?'none':'flex';
-  const v=$('#view'); $('#paperWrap').style.display = (S.tab==='gen' && $('#paper').innerHTML)?'block':'none';
+  $('#filters').style.display = ['set','gen','msg','reports','guide','obs','gal','struct','today'].includes(S.tab)?'none':'flex';
+  const v=$('#view'); if(S.tab==='gen') drawPreview(); else { $('#paperWrap').style.display='none'; }
   if(!S.reports.length && S.tab!=='set'){ v.innerHTML=emptyView(); wireDrop(); return; }
-  ({overview:vOverview,subs:vSubs,acts:vActs,chain:vChain,rfi:vRfi,reports:vReports,gen:vGen,set:vSet,obs:F.vObs,guide:F.vGuide,gal:GL.vGallery,struct:GL.vStructures,today:TD.vToday}[S.tab])(v);
+  ({overview:vOverview,subs:vSubs,acts:vActs,chain:vChain,rfi:vRfi,reports:vReports,gen:vGen,msg:MS.vMessages,set:vSet,obs:F.vObs,guide:F.vGuide,gal:GL.vGallery,struct:GL.vStructures,today:TD.vToday}[S.tab])(v);
   wireCommon(v);
 }
 function emptyView(){
   return `<div class="card" style="max-width:860px"><h2>Welcome to SiteBoard</h2><p class="sub">Three steps to see your site reports. Report files stay on your computer; the page only reads them.</p>
    <ol style="line-height:1.7;padding-left:20px"><li><b>Prepare the folder.</b> The folder with the SDR PDF reports (sub-folders are fine). If it is on Google Drive, set Drive for desktop to <i>Mirror files</i> so the files are on this PC.</li><li><b>Connect it.</b> Press the button below and choose the folder, then Allow.</li><li><b>Check the health card.</b> Open <i>Report files</i> to see how many reports were read, duplicates, and whether the folder needs tidying.</li></ol>
-   <div id="drop" class="drop">${HAS_FS?'<button class="btn pri" id="bConn2">Connect reports folder</button><p>Chrome or Edge on a computer. The folder is remembered; next time press Reconnect once.</p>':'<p>This browser cannot keep a folder connection. Use “Select reports folder” above, or drop PDF files here.</p>'}<p>…or drag &amp; drop PDF files here</p></div></div>`;
+   <div id="drop" class="drop">${HAS_FS?'<button class="btn pri" id="bConn2">Connect reports folder</button><p>Chrome, Edge or Brave (with folder access enabled) on a computer. The folder is remembered; next time press Reconnect once.</p>':'<p>This browser cannot keep a folder connection. Use “Select reports folder” above, or drop PDF files here.</p>'}<p>…or drag &amp; drop PDF files here</p></div>${fsNotice()}</div>`;
 }
 function wireDrop(){
   const b=$('#bConn2'); if(b) b.onclick=connect; const d=$('#drop'); if(!d) return;
@@ -268,7 +272,7 @@ function vGen(v){
   const sig=S.settings.signoff, f=g.form;
   const per=periodFor(g.type,g.anchor); if(!f.no||f.autoNo!==g.type+per.from){ f.no=defaultNo(g.type,per.from); f.autoNo=g.type+per.from; }
   const rcount=S.reports.filter(r=>r.date>=per.from&&r.date<=per.to).length;
-  v.innerHTML=`<div class="card"><h2>Generate weekly / monthly report</h2><div class="sub">Pick the period, review the photos, then build the report. Use <b>Print / Save as PDF</b> to produce the final A4 PDF (choose “Save as PDF”, paper A4, margins Default, tick “Background graphics”).</div>
+  v.innerHTML=`<div class="card"><h2>Generate weekly / monthly report</h2><div class="sub">Pick the period, review the photos, then build the report. <b>Build report</b> creates the A4 PDF directly (fixed margins, page numbers, full-resolution photos). Download it as PDF or Word, or send it by WhatsApp.</div>
    <div class="frm">
     <label class="fld">Report type<select id="gt"><option value="weekly" ${g.type==='weekly'?'selected':''}>Weekly (Mon–Sun)</option><option value="monthly" ${g.type==='monthly'?'selected':''}>Monthly</option></select></label>
     <label class="fld">${g.type==='weekly'?'Any date in the week':'Any date in the month'}<input type="date" id="ga" value="${g.anchor}"></label>
@@ -287,14 +291,14 @@ function vGen(v){
     <label class="fld">Checked by<input id="sc1" value="${esc(sig.checkedName||'')}"></label><label class="fld">Designation<input id="sc2" value="${esc(sig.checkedTitle||'')}"></label>
     <label class="fld">Reviewed / approved by<input id="sa1" value="${esc(sig.approvedName||'')}"></label><label class="fld">Designation<input id="sa2" value="${esc(sig.approvedTitle||'')}"></label>
    </div>
-   <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center"><button class="btn" id="gPh">Choose photos…</button><button class="btn pri" id="gBuild">Build report</button><button class="btn" id="gPrint">Print / Save as PDF</button><span id="gMsg" class="sub" style="margin:0"></span></div>
+   <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center"><button class="btn" id="gPh">Choose photos…</button><button class="btn pri" id="gBuild">Build report</button><span id="gMsg" class="sub" style="margin:0"></span></div>
    <div id="gGrid"></div></div>`;
   const bind=(id,fn)=>{ const e=$(id); e.onchange=e.oninput=()=>fn(e.value); };
-  $('#gt').onchange=(e)=>{ g.type=e.target.value; g.loaded=false; $('#paper').innerHTML=''; render(); };
-  $('#ga').onchange=(e)=>{ g.anchor=e.target.value||g.anchor; g.loaded=false; $('#paper').innerHTML=''; render(); };
+  $('#gt').onchange=(e)=>{ g.type=e.target.value; g.loaded=false; clearOut(); render(); };
+  $('#ga').onchange=(e)=>{ g.anchor=e.target.value||g.anchor; g.loaded=false; clearOut(); render(); };
   bind('#gn',x=>f.no=x); bind('#gtl',x=>f.title=x); bind('#gx',x=>f.extra=x); bind('#gp',x=>f.next=x); bind('#gr',x=>f.remarks=x); bind('#gm',x=>{f.maxPerDay=+x;g.loaded=false;});
   const sg=(id,k)=>bind(id,x=>{ sig[k]=x; saveLS(); }); sg('#sp1','preparedName');sg('#sp2','preparedTitle');sg('#sc1','checkedName');sg('#sc2','checkedTitle');sg('#sa1','approvedName');sg('#sa2','approvedTitle');
-  $('#gPh').onclick=()=>choosePhotos(); $('#gBuild').onclick=build; $('#gPrint').onclick=()=>doPrint();
+  $('#gPh').onclick=()=>choosePhotos(); $('#gBuild').onclick=build; 
   if(g.loaded && $('#gGrid')) drawGrid();
 }
 function candidates(per){
@@ -328,21 +332,34 @@ async function loadThumbs(){
     try{ const u=await getPhoto(c.report,c.item); if(u) img.src=u; }catch(_){}
     n++; const p=$('#gprog i'); if(p) p.style.width=Math.round(100*n/imgs.length)+'%'; if(S.tab!=='gen') return; }
 }
-async function build(){
-  const g=S.gen, per=periodFor(g.type,g.anchor); const msg=$('#gMsg');
+function genModel(){
+  const g=S.gen, per=periodFor(g.type,g.anchor);
   if(!g.loaded){ g.cands=candidates(per); g.sel=autoSelect(g.cands,g.form.maxPerDay??4); g.loaded=true; }
-  msg.textContent='Preparing photos…'; const photos=[];
-  for(const c of g.cands){ if(!g.sel.has(c.key)) continue; try{ const url=await getPhoto(c.report,c.item); if(url) photos.push({...c,url}); }catch(_){} msg.textContent=`Preparing photos… ${photos.length}/${g.sel.size}`; }
-  const html=buildReport({type:g.type,from:per.from,to:per.to,all:S.reports,settings:S.settings,form:g.form,photos});
-  $('#paper').innerHTML=html; $('#paperWrap').style.display='block'; msg.textContent='Report built – scroll down to preview.';
-  setTimeout(()=>$('#paperWrap').scrollIntoView({behavior:'smooth'}),50);
+  const photos=g.cands.filter(c=>g.sel.has(c.key));
+  return buildModel({type:g.type,from:per.from,to:per.to,all:S.reports,settings:S.settings,form:g.form,photos});
 }
-function doPrint(){
-  if(!$('#paper').innerHTML){ build().then(doPrint); return; }
-  const f=S.gen.form; let st=$('#pgstyle'); if(!st){ st=document.createElement('style'); st.id='pgstyle'; document.head.appendChild(st); }
-  st.textContent=`@page{ @bottom-left{content:"${(f.no||'').replace(/"/g,'')} · SiteBoard";font:8pt Arial;color:#666} @bottom-right{content:"Page " counter(page) " of " counter(pages);font:8pt Arial;color:#666} } @page :first{ @bottom-left{content:none} @bottom-right{content:none} }`;
-  window.print();
+const opts=(msg)=>({getFull,onProgress:(t)=>{ msg.textContent=t; }});
+function setOut(kind,res){ const g=S.gen; g.out=g.out||{}; if(g.out[kind]&&g.out[kind].url) URL.revokeObjectURL(g.out[kind].url); g.out[kind]={...res,url:URL.createObjectURL(res.blob)}; }
+function saveBlob(o){ const a=document.createElement('a'); a.href=o.url; a.download=o.name; document.body.appendChild(a); a.click(); a.remove(); }
+async function build(){
+  const g=S.gen; const msg=$('#gMsg'); $('#gBuild').disabled=true;
+  try{
+    msg.textContent='Preparing report…'; const model=genModel(); g.model=model;
+    const res=await renderPdf(model,opts(msg)); setOut('pdf',res);
+    drawPreview(); msg.textContent=`Built ${res.pages} pages · ${(res.blob.size/1048576).toFixed(1)} MB`;
+  }catch(e){ console.error(e); msg.textContent='Could not build the report: '+e.message; }
+  $('#gBuild').disabled=false;
 }
+function drawPreview(){
+  const g=S.gen, o=g.out&&g.out.pdf; const w=$('#paperWrap'); if(!o){ w.innerHTML=''; w.style.display='none'; return; }
+  w.style.display='block';
+  w.innerHTML=`<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><b>Report preview</b><span class="sp"></span><button class="btn pri" id="dlPdf">Download PDF</button><button class="btn" id="dlDocx">Download Word</button><button class="btn" id="opPdf">Open in new tab</button><button class="btn" id="waPdf">Send via WhatsApp…</button></div>
+   <div class="sub" style="margin:6px 0">${esc(o.name)}</div><iframe class="pdfv" title="Report preview" src="${o.url}#view=FitH"></iframe><div class="sub" id="pvNote">If the preview stays blank in your browser, use “Open in new tab”.</div></div>`;
+  $('#dlPdf').onclick=()=>saveBlob(o); $('#opPdf').onclick=()=>window.open(o.url,'_blank');
+  $('#dlDocx').onclick=async(e)=>{ const b=e.target; b.disabled=true; b.textContent='Building Word…'; try{ if(!g.out.docx){ const res=await renderDocx(g.model,opts($('#pvNote'))); setOut('docx',res); } saveBlob(g.out.docx); }catch(er){ console.error(er); $('#pvNote').textContent='Word export failed: '+er.message; } b.disabled=false; b.textContent='Download Word'; };
+  $('#waPdf').onclick=()=>MS.compose({type:'Report',attach:[{name:o.name,blob:o.blob}],text:`${g.model.no} ${g.model.title}\n${g.model.period}`});
+}
+function clearOut(){ const g=S.gen; for(const k of Object.keys(g.out||{})) URL.revokeObjectURL(g.out[k].url); g.out=null; g.model=null; }
 
 // ------------------------------------------------------------------ settings
 function vSet(v){
@@ -356,6 +373,7 @@ function vSet(v){
    <h2 style="margin-top:16px">Links & QR codes</h2><div class="sub">Share the two apps with the team: scan to open on a phone.</div><div style="display:flex;gap:18px;flex-wrap:wrap"><div style="text-align:center"><div id="qrA"></div><div class="sub">SiteBoard (view)</div></div><div style="text-align:center"><div id="qrB"></div><div class="sub">SDR report app</div></div></div>
    <h2 style="margin-top:16px">Report cover logo</h2><div class="sub">Optional. A small logo shown on the cover of weekly and monthly reports.</div>${P.logo?`<img src="${P.logo}" alt="" style="height:40px;background:#fff;border:1px solid var(--line);padding:3px;margin-right:8px">`:''}<input type="file" id="lgF" accept="image/*" style="display:none"><button class="btn" id="lgB">Choose logo</button> ${P.logo?'<button class="btn" id="lgX">Remove</button>':''}
    <h2 style="margin-top:16px">Structure list</h2><div class="sub">${structuresList(S.settings).length} structures in use (${S.settings.setup?'imported from SDR setup.json':'built-in default'}). To update, import the <code>setup.json</code> from the SDR app.</div><input type="file" id="stF" accept=".json" style="display:none"><button class="btn" id="stB">Import SDR setup.json</button> <span class="sub" id="stM"></span>
+   <h2 style="margin-top:16px">About</h2><div class="sub">SiteBoard v${VERSION} · ${CREDIT}. Free, runs in your browser; reports never leave your computer.<br>Licence: <a href="LICENSE" target="_blank" rel="noopener">MIT</a> · Third-party software: <a href="THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">notices and licences</a> (pdf.js, jsPDF, docx, SheetJS, qrcode-generator, Barlow / IBM Plex fonts).</div>
    <h2 style="margin-top:16px">Reporting rules</h2><div class="sub">Roles that must report every working day (others report as required).</div><div style="display:flex;gap:14px;flex-wrap:wrap">${roles.map(r=>`<label><input type="checkbox" data-role="${esc(r)}" ${(S.settings.expectedRoles||DEFAULTS.expectedRoles).includes(r)?'checked':''}> ${esc(r)}</label>`).join('')}</div>
    <h2 style="margin-top:16px">Share with team</h2><div class="sub">Project details, reporting rules, non-working days and observation follow-up are saved in <code>siteboard-settings.json</code> in the report folder.</div><button class="btn" id="svShared">Save settings to folder</button> <span id="svMsg" class="sub"></span>
    <p class="sub" style="margin-top:12px">Non-working days you marked: ${S.settings.daysOff.length+S.settings.daysOn.length} <button class="btn sm" id="clrd">Reset</button></p></div></div>`;
@@ -380,9 +398,11 @@ function closeDrawer(){ $('#drawer').style.display='none'; $('#dbg').style.displ
 function openList(title,rs){ drawer(`<h3>${esc(title)}</h3><table class="t"><tbody>${rs.map(r=>`<tr><td>${refLink(r)}</td><td>${r.items.length} items</td></tr>`).join('')}</tbody></table>`); wireCommon($('#drawer')); }
 async function openReport(ref){
   const r=S.reports.find(x=>x.ref===ref); if(!r) return;
-  drawer(`<h3>${esc(r.ref)}</h3><p class="sub">${A.fmtDate(r.date,true)} · ${esc(r.reporter)}, ${esc(r.role)} · ${esc(r.zoneLabel)} · Weather: ${esc(r.weatherRaw)} · ${r.pages} pages · generator v${esc(r.version)}<br>File: ${esc(r.path)}</p>${r.warnings.map(w=>`<div class="alert warn">${esc(w)}</div>`).join('')}
-   <div class="ph-grid">${r.items.map(it=>`<div class="ph"><img alt="" data-n="${it.no}"><div class="cap"><b>${String(it.no).padStart(2,'0')} ${esc(it.activity)}</b> ${it.time?'· '+esc(it.time):''}<br>${esc(it.bq)}${it.bq?' · ':''}${esc(it.location)}${it.structure?' · '+esc(it.structure):''}<br>${esc(it.status)}${it.rfi?' · RFI '+esc(it.rfi):''}${it.remarks?'<br><i>'+esc(it.remarks)+'</i>':''}</div></div>`).join('')}</div>`);
-  for(const it of r.items){ const img=$(`#drawer img[data-n="${it.no}"]`); if(!img) continue; try{ const u=await getPhoto(r,it); if(u) img.src=u; }catch(_){} }
+  drawer(`<h3>${esc(r.ref)}</h3><p class="sub">${A.fmtDate(r.date,true)} · ${esc(r.reporter)}, ${esc(r.role)} · ${esc(r.zoneLabel)} · Weather: ${esc(r.weatherRaw)} · ${r.pages} pages · generator v${esc(r.version)}<br>File: ${esc(r.path)}</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"><button class="btn" id="orPdf">Open PDF</button><button class="btn pri" id="orCm">Comment / send via WhatsApp</button></div>${r.warnings.map(w=>`<div class="alert warn">${esc(w)}</div>`).join('')}
+   <div class="ph-grid">${r.items.map(it=>`<div class="ph"><img alt="" data-n="${it.no}"><div class="cap"><b>${String(it.no).padStart(2,'0')} ${esc(it.activity)}</b> ${it.time?'· '+esc(it.time):''}<br>${esc(it.bq)}${it.bq?' · ':''}${esc(it.location)}${it.structure?' · '+esc(it.structure):''}<br>${esc(it.status)}${it.rfi?' · RFI '+esc(it.rfi):''}${it.remarks?'<br><i>'+esc(it.remarks)+'</i>':''}<br><button class="btn sm" data-cm="${it.no}" style="margin-top:4px">Comment…</button></div></div>`).join('')}</div>`);
+  $('#orPdf').onclick=()=>MS.openPdf(r); $('#orCm').onclick=()=>MS.composeForReport(r);
+  document.querySelectorAll('#drawer [data-cm]').forEach(b=>b.onclick=()=>MS.composeForItem(r,r.items.find(i=>i.no==b.dataset.cm)));
+  for(const it of r.items){ const img=$(`#drawer img[data-n="${it.no}"]`); if(!img) continue; loadInto(img,r,it); }
 }
 
 // ------------------------------------------------------------------ tooltip
@@ -394,10 +414,12 @@ $('#dbg').onclick=closeDrawer;
 window.addEventListener('beforeprint',()=>closeDrawer());
 const GL=makeGallery({S,$,drawer,wireCommon,refLink,resolveRange,openReport,saveLS,render});
 const TD=makeToday({S,$,GL});
+const MS=makeMessages({S,$,drawer,closeDrawer,saveLS,refLink,wireCommon,openReport}); S.MS=MS;
 const F=makeFeatures({S,$,render,drawer,closeDrawer,refLink,wireCommon,saveLS,refresh});
 $('#gs').oninput=(e)=>{ clearTimeout(F._t); F._t=setTimeout(()=>F.openSearch(e.target.value),250); };
 window.__wp12={S,render,fromFiles,F,applyTeam,refresh};
 A.setActivityMap((S.settings.setup&&S.settings.setup.actMap)||DEFAULT_ACTMAP);
 $('#menu').onclick=()=>document.body.classList.toggle('nav-open'); $('#navbg').onclick=()=>document.body.classList.remove('nav-open');
 $('#thm').onclick=()=>{ const dark=document.documentElement.dataset.theme?document.documentElement.dataset.theme==='dark':matchMedia('(prefers-color-scheme:dark)').matches; S.settings.theme=dark?'light':'dark'; applyTheme(); saveLS(); };
+$('#verTag').textContent=`v${VERSION}`;
 applyTheme(); boot();
