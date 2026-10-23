@@ -132,7 +132,7 @@ export function parseReport(pages, meta={}){
   let cols=null, table=[];
   for(const p of pages){
     const c=colsFromHeader(p.items); if(c) cols=c;
-    const cardPage=p.items.some(i=>i.s==='Status'&&i.x<400);
+    const cardPage=p.items.some(i=>(i.s==='Status'||i.s==='Location')&&i.x<400);
     if(cardPage) continue;
     if(c||(cols&&p.items.some(i=>/^\d{1,3}$/.test(i.s)&&i.x<45&&i.y<730))) table=table.concat(parseTable(p,cols||COLS_DEFAULT));
   }

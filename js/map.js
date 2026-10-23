@@ -150,7 +150,7 @@ export function makeMap(ctx){
       <label class="fld" style="margin:0">Category<select id="mpC">${sel(cats,M.cat,'All categories')}</select></label><label class="fld" style="margin:0">Reported by<select id="mpW">${sel(people,M.who,'Everyone')}</select></label>
       <span style="flex:1"></span><button class="btn sm" id="mpFl">Zoom to alignment</button><button class="btn sm" id="mpFp">Zoom to photos</button><button class="btn pri" id="mpSn">Snap map…</button></div>
      <div style="margin-bottom:8px;font-size:13px">${chk('mpL','line','Alignment')}${chk('mpH','chain','Chainage')}${chk('mpP','poi','Points of interest')}${chk('mpR','row','ROW boundary')}${chk('mpI','pins','Inspections / photos')}</div>
-     <div id="mpMap" style="height:600px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#dfe5e8"></div><div class="sub" id="mpInfo" style="margin-top:8px"></div>
+     <div id="mpMap" style="position:relative;z-index:0;isolation:isolate;height:600px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#dfe5e8"></div><div class="sub" id="mpInfo" style="margin-top:8px"></div>
      <div id="mpLg" style="margin-top:4px;font-size:12.5px"></div>${navigator.onLine===false?'<p class="sub">You appear to be offline: the basemap needs internet, the alignment and pins still show.</p>':''}</div>`;
     $('#mpK').onclick=()=>$('#mpF').click();
     $('#mpF').onchange=async(e)=>{ const f=e.target.files[0]; if(!f) return; $('#mpSt').textContent='Reading '+f.name+'…'; try{ await loadFile(f); M.view=null; render(); }catch(er){ $('#mpSt').textContent='Could not read the file: '+er.message; } };
