@@ -8,7 +8,7 @@ import re, glob, json, html, os, markdown
 APP_URL  = 'https://cstwp12-admin.github.io/siteboard/'      # the dashboard
 REPO_URL = 'https://github.com/cstwp12-admin/siteboard'
 SDR_URL  = 'https://cstwp12-admin.github.io/wp12-sdr/'
-VERSION  = 'v0.6.0'
+VERSION  = 'v0.6.1'
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
 CSS = open(os.path.join(HERE, 'docs.css'), encoding='utf-8').read()
 

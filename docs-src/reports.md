@@ -16,6 +16,11 @@ A **logo** can be added to the cover in Settings. The report is generated on you
 
 *Export Excel* (top of most pages) saves the period's activities, submissions, RFIs, weather and observations as a workbook.
 
+## Sharing the matrix and overview
+- On *Submissions* press **Share / save matrix…**; on *Overview* press **Share / save overview…**. A preview image is made for the period chosen at the top of the page.
+- The description is written for you (period, compliance, who has no report on which days) and can be edited. Choose **Send via WhatsApp**, **Download image** (PNG), **Download PDF** or **Copy image**.
+- On a computer WhatsApp cannot receive the image from a web page: SiteBoard downloads it and opens WhatsApp, and you attach it with the paperclip (or paste it if you used *Copy image*).
+
 ## Opening, commenting and sending
 - In *Report files*, click a report reference, then **Open PDF** to read the original SDR PDF in a browser tab straight from your folder.
 - **Comment / send via WhatsApp** (same panel), the **Comment…** button on each item and **Send…** in *Observations* open the message composer with the details filled in.

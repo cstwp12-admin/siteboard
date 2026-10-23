@@ -9,8 +9,8 @@ Site reporting dashboard for the WP12 Pan Borneo Sabah Fasa 1B supervision team.
 
 ## How it works
 1. IOWs make the daily report in the **SDR app** and send the PDF.
-2. The report admin saves the PDFs in the shared Google Drive folder.
-3. Everyone opens **SiteBoard** in Chrome, Edge or Brave (folder access enabled), connects the folder, and sees the same numbers.
+2. The report admin (the RE or an assigned ARE) saves the PDFs into a reports folder on his or her computer.
+3. Open **SiteBoard** in Chrome, Edge or Brave (folder access enabled), connect that folder, and the matrices and reports are built from it.
 
 Report files never leave your computer. This website holds the program code only.
 

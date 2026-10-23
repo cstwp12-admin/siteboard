@@ -115,8 +115,9 @@ export function makeMessages(ctx){
 
   // ---------------------------------------------------------------- memo
   const memoSeq=()=>{ const y=new Date().getFullYear(); const n=(S.settings.memoSeq&&S.settings.memoSeq[y]||0)+1; return {y,n}; };
-  function memoDefaults(){ const s=memoSeq(); const m=me(); const p=P();
-    return {no:`MEMO/${p.team?'':'WP12/'}${s.y}/${String(s.n).padStart(3,'0')}`,date:A.iso(new Date()),to:'All site personnel',from:`${m.name}${m.title?', '+m.title:''}`,cc:'',subject:'',kind:'For information',body:'',actions:'',att:[]}; }
+  const memoPrefix=()=>(S.settings.memoPrefix||'SB/INT/MEMO').replace(/\/+$/,'');
+  function memoDefaults(){ const s=memoSeq(); const m=me();
+    return {no:`${memoPrefix()}/${s.y}/${String(s.n).padStart(3,'0')}`,date:A.iso(new Date()),to:'All site personnel',from:`${m.name}${m.title?', '+m.title:''}`,cc:'',subject:'',kind:'For information',body:'',actions:'',att:[]}; }
 
   async function renderMemo(m){
     const doc=await newDoc(); const p=P();
@@ -126,24 +127,24 @@ export function makeMessages(ctx){
     const col=m.kind==='Urgent'?'#B2271B':m.kind==='For action'?T.accent:T.navy; doc.setFillColor(...hex(col)); doc.roundedRect(PG.w-PG.mr-34,43,34,7,1.2,1.2,'F'); doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(255); doc.text(clean(m.kind.toUpperCase()),PG.w-PG.mr-17,47.7,{align:'center'});
     doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor(...hex(T.navy)); doc.text('MEMO',PG.ml,y); y+=3;
     const rows=[['Memo no.',m.no],['Date',A.fmtDate(m.date)],['To',m.to],['From',m.from]]; if(m.cc) rows.push(['Cc',m.cc]);
-    doc.autoTable({startY:y+2,body:rows.map(r=>r.map(clean)),theme:'plain',margin:{left:PG.ml,right:PG.mr},styles:{fontSize:10,cellPadding:{top:1.6,bottom:1.6,left:0,right:3},textColor:hex(T.ink)},columnStyles:{0:{cellWidth:28,textColor:hex(T.muted),fontStyle:'bold'}}});
+    doc.autoTable({startY:y+2,body:rows.map(r=>r.map(clean)),theme:'plain',margin:{left:PG.ml,right:PG.mr},styles:{fontSize:10,cellPadding:{top:1,bottom:1,left:0,right:3},textColor:hex(T.ink)},columnStyles:{0:{cellWidth:28,textColor:hex(T.muted),fontStyle:'bold'}}});
     y=doc.lastAutoTable.finalY+3; doc.setDrawColor(...hex(T.accent)); doc.setLineWidth(0.7); doc.line(PG.ml,y,PG.w-PG.mr,y); y+=8;
     doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(...hex(T.navy)); const sl=doc.splitTextToSize(clean('Subject: '+m.subject),CW); doc.text(sl,PG.ml,y); y+=sl.length*6+3;
-    const room=(h)=>{ if(y+h>PG.h-PG.mb){ doc.addPage(); y=PG.mt; } };
-    doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor(...hex(T.ink));
+    const room=(h)=>{ if(y+h>PG.h-17){ doc.addPage(); y=PG.mt; } };
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...hex(T.ink));
     for(const raw of m.body.split('\n')){
-      const line=raw.replace(/\s+$/,''); if(!line.trim()){ y+=3; continue; }
+      const line=raw.replace(/\s+$/,''); if(!line.trim()){ y+=2.2; continue; }
       const b=/^\s*[-•*]\s+/.test(line), num=line.match(/^\s*(\d+[.)])\s+/);
       const txt=clean(line.replace(/^\s*[-•*]\s+/,'').replace(/^\s*\d+[.)]\s+/,'')); const ind=(b||num)?6:0; const ls=doc.splitTextToSize(txt,CW-ind);
-      room(ls.length*5+1);
+      room(ls.length*4.6+1);
       if(b){ doc.setFillColor(...hex(T.accent)); doc.circle(PG.ml+2,y-1.2,0.8,'F'); } if(num) { doc.setFont('helvetica','bold'); doc.text(num[1],PG.ml,y); doc.setFont('helvetica','normal'); }
-      ls.forEach((l,i)=>{ doc.text(l,PG.ml+ind,y); y+=5; }); y+=1.2; }
+      ls.forEach((l,i)=>{ doc.text(l,PG.ml+ind,y); y+=4.6; }); y+=1; }
     const acts=(m.actions||'').split('\n').map(s=>s.trim()).filter(Boolean).map(s=>s.split('|').map(x=>x.trim()));
     if(acts.length){ room(24); y+=3; doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...hex(T.accent)); doc.text('ACTION REQUIRED',PG.ml,y); y+=2;
-      doc.autoTable({startY:y,head:[['No.','Action','By whom','By when']],body:acts.map((a,i)=>[String(i+1),clean(a[0]||''),clean(a[1]||''),clean(a[2]||'')]),theme:'grid',margin:{left:PG.ml,right:PG.mr,top:PG.mt,bottom:PG.mb},styles:{fontSize:9,cellPadding:1.8,lineColor:hex(T.line),lineWidth:0.15},headStyles:{fillColor:hex(T.navy),textColor:255},columnStyles:{0:{cellWidth:10},2:{cellWidth:34},3:{cellWidth:28}},rowPageBreak:'avoid'}); y=doc.lastAutoTable.finalY+4; }
+      doc.autoTable({startY:y,head:[['No.','Action','By whom','When']],body:acts.map((a,i)=>[String(i+1),clean(a[0]||''),clean(a[1]||''),clean(a[2]||'')]),theme:'grid',margin:{left:PG.ml,right:PG.mr,top:PG.mt,bottom:PG.mb},styles:{fontSize:9,cellPadding:1.2,lineColor:hex(T.line),lineWidth:0.15},headStyles:{fillColor:hex(T.navy),textColor:255},columnStyles:{0:{cellWidth:10},2:{cellWidth:34},3:{cellWidth:28}},rowPageBreak:'avoid'}); y=doc.lastAutoTable.finalY+4; }
     if(m.att.length){ room(14); y+=2; doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(...hex(T.navy)); doc.text('Attachments',PG.ml,y); y+=4.5; doc.setFont('helvetica','normal'); doc.setTextColor(...hex(T.ink)); for(const a of m.att){ room(5); doc.text(clean('• '+a.name),PG.ml+2,y); y+=4.5; } }
-    room(30); y+=10; doc.setDrawColor(...hex(T.ink)); doc.setLineWidth(0.3); doc.line(PG.ml,y+12,PG.ml+60,y+12); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...hex(T.ink)); doc.text(clean(m.from.split(',')[0]||''),PG.ml,y+17);
-    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...hex(T.muted)); doc.text(clean(m.from.split(',').slice(1).join(',').trim()),PG.ml,y+21.5);
+    room(19); y+=4; doc.setDrawColor(...hex(T.ink)); doc.setLineWidth(0.3); doc.line(PG.ml,y+7,PG.ml+60,y+7); doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...hex(T.ink)); doc.text(clean(m.from.split(',')[0]||''),PG.ml,y+11.5);
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...hex(T.muted)); doc.text(clean(m.from.split(',').slice(1).join(',').trim()),PG.ml,y+15.5);
     frame(doc,{left:`${p.title} — Internal memo`,right:m.no,footLeft:`Generated by SiteBoard v${VERSION} · ${A.fmtDate(m.date)}`,skipFirst:false,noHeaderFirst:true});
     doc.setProperties({title:`${m.no} ${m.subject}`,creator:'SiteBoard'});
     return {blob:doc.output('blob'),name:`${m.no.replace(/[\\/]/g,'-')} ${m.subject.replace(/[\\/:*?"<>|]+/g,'').slice(0,60)}.pdf`.trim(),pages:doc.getNumberOfPages()};
@@ -153,11 +154,13 @@ export function makeMessages(ctx){
     L.push('━━━━━━━━━━━━━━━━','');
     for(const raw of m.body.split('\n')){ const t=raw.trim(); L.push(/^[-*•]\s+/.test(t)?'• '+t.replace(/^[-*•]\s+/,''):t); }
     const acts=(m.actions||'').split('\n').map(s=>s.trim()).filter(Boolean).map(s=>s.split('|').map(x=>x.trim()));
-    if(acts.length){ L.push('','*Action required*'); acts.forEach((a,i)=>L.push(`${i+1}. ${a[0]||''}${a[1]?' – '+a[1]:''}${a[2]?' (by '+a[2]+')':''}`)); }
+    if(acts.length){ L.push('','*Action required*'); acts.forEach((a,i)=>L.push(`${i+1}. ${a[0]||''}${a[1]?' – '+a[1]:''}${a[2]?' ('+a[2]+')':''}`)); }
     L.push('','━━━━━━━━━━━━━━━━',`${m.from}`,`_${p.consultant||p.team||'WP12'}_`); if(m.att.length||true) L.push('_Full memo attached (PDF)._');
     return L.join('\n').replace(/\n{3,}/g,'\n\n');
   }
 
+  // remember the highest number used per year so the next memo continues the series
+  function useNo(no){ const m=String(no||'').match(/\/(\d{4})\/(\d+)\s*$/); if(!m) return; S.settings.memoSeq=S.settings.memoSeq||{}; S.settings.memoSeq[m[1]]=Math.max(S.settings.memoSeq[m[1]]||0,+m[2]); saveLS(); }
   // ---------------------------------------------------------------- Messages tab
   function vMessages(v){
     const M=S.memo=S.memo||memoDefaults();
@@ -170,9 +173,9 @@ export function makeMessages(ctx){
        <label class="fld">Cc<input data-m="cc" value="${esc(M.cc)}"></label><label class="fld">Status<select data-m="kind">${['For information','For action','Urgent'].map(k=>`<option ${M.kind===k?'selected':''}>${k}</option>`).join('')}</select></label></div>
       <label class="fld" style="margin-top:8px">Subject<input data-m="subject" value="${esc(M.subject)}" style="width:100%"></label>
       <label class="fld" style="margin-top:8px">Memo text <span class="sub">(start a line with “-” for a bullet)</span><textarea data-m="body" rows="8" style="width:100%">${esc(M.body)}</textarea></label>
-      <label class="fld" style="margin-top:8px">Actions <span class="sub">(one per line: action | by whom | by when)</span><textarea data-m="actions" rows="3" style="width:100%">${esc(M.actions)}</textarea></label>
+      <label class="fld" style="margin-top:8px">Actions <span class="sub">(one per line: action | by whom | when)</span><textarea data-m="actions" rows="3" style="width:100%">${esc(M.actions)}</textarea></label>
       <div style="margin-top:8px"><b>Attachments</b> <span class="sub">(sent together with the memo)</span>${M.att.map((a,i)=>`<div class="sub" style="margin:3px 0">${esc(a.name)} · ${kb(a.blob.size)} <button class="btn sm" data-rm="${i}">Remove</button></div>`).join('')}<br><input type="file" id="memoF" multiple style="display:none"><button class="btn sm" id="memoFb">Add file…</button></div>
-      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center"><button class="btn pri" id="memoPrev">Preview memo</button><button class="btn" id="memoDl">Download PDF</button><button class="btn" id="memoWa">Send via WhatsApp…</button><span class="sub" id="memoMsg" style="margin:0"></span></div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center"><button class="btn pri" id="memoPrev">Preview memo</button><button class="btn" id="memoDl">Download PDF</button><button class="btn" id="memoWa">Send via WhatsApp…</button><button class="btn" id="memoNew">New memo</button><span class="sub" id="memoMsg" style="margin:0"></span></div>
       <div id="memoView"></div></div></div>
      <div class="card" style="margin-top:12px"><h2>Sent messages</h2><div class="sub">A record of what was sent from this browser. Shared with the team through “Save settings to folder”.</div>
       <div class="scroll"><table class="t"><thead><tr><th>When</th><th>Type</th><th>Subject / reference</th><th>To</th><th>Files</th><th></th></tr></thead><tbody>
@@ -184,14 +187,15 @@ export function makeMessages(ctx){
     v.querySelectorAll('[data-re]').forEach(b=>b.onclick=()=>{ const e=log().find(x=>x.id===b.dataset.re); compose({title:'Resend message',type:e.type||'General',body:(e.text||'').split('\n').slice(2).join('\n').replace(/\n— [\s\S]*$/,'').trim()}); });
     const need=()=>{ if(!M.subject.trim()||!M.body.trim()){ $('#memoMsg').textContent='Enter a subject and the memo text first.'; return false; } return true; };
     const make=async()=>{ if(!need()) return null; $('#memoMsg').textContent='Building memo…'; const r=await renderMemo(M); S.memoOut&&URL.revokeObjectURL(S.memoOut.url); S.memoOut={...r,url:URL.createObjectURL(r.blob)}; $('#memoMsg').textContent=`${r.pages} page${r.pages>1?'s':''}`; return S.memoOut; };
+    $('#memoNew').onclick=()=>{ S.memo=null; vMessages(v); };
     $('#memoPrev').onclick=async()=>{ try{ const o=await make(); if(o) $('#memoView').innerHTML=`<iframe class="pdfv" title="Memo preview" src="${o.url}#view=FitH"></iframe><div class="sub"><a href="${o.url}" target="_blank" rel="noopener">Open in new tab</a> if the preview is blank.</div>`; }catch(e){ console.error(e); $('#memoMsg').textContent='Could not build memo: '+e.message; } };
-    $('#memoDl').onclick=async()=>{ try{ const o=await make(); if(o){ download(o.name,o.blob); } }catch(e){ $('#memoMsg').textContent='Could not build memo: '+e.message; } };
+    $('#memoDl').onclick=async()=>{ try{ const o=await make(); if(o){ download(o.name,o.blob); useNo(M.no); } }catch(e){ $('#memoMsg').textContent='Could not build memo: '+e.message; } };
     $('#memoWa').onclick=async()=>{ try{ const o=await make(); if(!o) return;
       compose({title:'Send memo via WhatsApp',type:'General',subject:'Memo: '+M.subject,attach:[{name:o.name,blob:o.blob},...M.att],memo:M,body:'',_text:memoText(M)}); 
       // override the composed text with the formatted announcement
       setTimeout(()=>{ const x=$('#mx'); if(x){ x.value=memoText(M); x.dispatchEvent(new Event('input')); } const b=$('#mb'); if(b) b.closest('label').style.display='none'; const sel=['#mt','#mp','#mr','#ml','#md','#mu']; sel.forEach(s=>{ const e=$(s); if(e) e.closest('label').style.display='none'; }); },0);
-      const sv=()=>{ const y=new Date().getFullYear(); S.settings.memoSeq=S.settings.memoSeq||{}; S.settings.memoSeq[y]=Math.max(S.settings.memoSeq[y]||0,memoSeq().n); saveLS(); }; sv();
+      useNo(M.no);
     }catch(e){ $('#memoMsg').textContent='Could not build memo: '+e.message; } };
   }
-  return { compose, composeForItem, composeForReport, vMessages, openPdf };
+  return { compose, composeForItem, composeForReport, vMessages, openPdf, logSent:addLog };
 }

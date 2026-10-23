@@ -9,6 +9,7 @@ import { getPhoto, getFull, extractReport, loadInto } from './photos.js';
 import { makeGallery } from './gallery.js';
 import { makeToday } from './today.js';
 import { makeMessages } from './messages.js';
+import { makeSnapshot } from './snapshot.js';
 import { importSetup, structuresList, DEFAULT_ACTMAP } from './structures.js';
 import { periodFor, defaultNo } from './report.js';
 import { buildModel, fileBase } from './model.js';
@@ -144,7 +145,7 @@ function render(){
 }
 function emptyView(){
   return `<div class="card" style="max-width:860px"><h2>Welcome to SiteBoard</h2><p class="sub">Three steps to see your site reports. Report files stay on your computer; the page only reads them.</p>
-   <ol style="line-height:1.7;padding-left:20px"><li><b>Prepare the folder.</b> The folder with the SDR PDF reports (sub-folders are fine). If it is on Google Drive, set Drive for desktop to <i>Mirror files</i> so the files are on this PC.</li><li><b>Connect it.</b> Press the button below and choose the folder, then Allow.</li><li><b>Check the health card.</b> Open <i>Report files</i> to see how many reports were read, duplicates, and whether the folder needs tidying.</li></ol>
+   <ol style="line-height:1.7;padding-left:20px"><li><b>Prepare the folder.</b> The folder on this computer that holds the SDR PDF reports (sub-folders are fine).</li><li><b>Connect it.</b> Press the button below and choose the folder, then Allow.</li><li><b>Check the health card.</b> Open <i>Report files</i> to see how many reports were read, duplicates, and whether the folder needs tidying.</li></ol>
    <div id="drop" class="drop">${HAS_FS?'<button class="btn pri" id="bConn2">Connect reports folder</button><p>Chrome, Edge or Brave (with folder access enabled) on a computer. The folder is remembered; next time press Reconnect once.</p>':'<p>This browser cannot keep a folder connection. Use “Select reports folder” above, or drop PDF files here.</p>'}<p>…or drag &amp; drop PDF files here</p></div>${fsNotice()}</div>`;
 }
 function wireDrop(){
@@ -172,11 +173,11 @@ function vOverview(v){
   // alerts
   let alerts=''; const ydays=[t, A.addDays(t,-1)].filter(d=>A.isWorkDay(d,S.settings));
   const latest=A.matrix(S.reports.filter(r=>ydays.includes(r.date)),ydays,S.settings,t);
-  const missing=[]; for(const row of latest.rows) for(const c of row.cells) if(row.p.expected&&c.work&&c.past&&!c.rs.length&&c.d<t) missing.push(`${row.p.name} (${A.fmtShort(c.d)})`);
+  const missing=[]; for(const row of latest.rows) for(const c of row.cells) if(row.p.expected&&c.work&&c.past&&!c.rs.length&&!c.ex&&c.d<t) missing.push(`${row.p.name} (${A.fmtShort(c.d)})`);
   if(missing.length) alerts+=`<div class="alert warn"><b>No report yet:</b> ${esc(missing.join(', '))}</div>`;
   const warns=reps.filter(r=>r.warnings.length); if(warns.length||S.errors.length) alerts+=`<div class="alert bad">${S.errors.length?S.errors.length+' file(s) could not be read. ':''}${warns.length?warns.length+' report(s) have parsing warnings. ':''}<span class="lnk" onclick="document.querySelector('[data-t=reports]').click()">Review in “Report files”</span></div>`;
   const recent=reps.slice().sort((a,b)=>b.mtime-a.mtime).slice(0,8);
-  v.innerHTML=`${alerts}
+  v.innerHTML=`${alerts}<div style="margin-bottom:10px"><button class="btn pri" id="bShareOv">Share / save overview…</button></div>
   <div class="grid g6">
    ${kpi('Reports received',reps.length,`${new Set(reps.map(r=>r.code)).size} personnel`)}
    ${kpi('Work items photographed',rows.length,`${new Set(rows.map(r=>r.act.toLowerCase())).size} distinct activities`)}
@@ -191,6 +192,7 @@ function vOverview(v){
    <div class="card"><h2>Latest files received</h2><div class="sub">By file date</div><table class="t"><thead><tr><th>Report</th><th>Reporter</th><th class="num">Items</th></tr></thead><tbody>${recent.map(r=>`<tr><td>${refLink(r)}<br><span class="badge">${A.fmtShort(r.date)}</span></td><td>${esc(r.reporter)} <span class="badge">${esc(r.role)}</span></td><td class="num">${r.items.length}</td></tr>`).join('')}</tbody></table></div>
    <div class="card" style="grid-column:1/-1"><h2>Where works were photographed</h2><div class="sub">CH 62+700 – 77+508 · dominant category per 100 m</div>${strip(bins,{w:1100})}</div>
   </div>`;
+  $('#bShareOv').onclick=()=>SN.open('overview');
 }
 
 function vSubs(v){
@@ -198,21 +200,32 @@ function vSubs(v){
   let days=A.dateRange(from,to); let note='';
   if(days.length>62){ days=days.slice(-62); note=' (showing last 62 days)'; }
   const mx=A.matrix(S.reports.filter(r=>r.date>=days[0]&&r.date<=days.at(-1)),days,S.settings,t);
-  v.innerHTML=`<div class="card"><h2>Submission matrix${note}</h2><div class="sub">One row per person, one column per day. Click a day heading to mark it as a non-working day (holiday / rain stop). Tick “expected” for people who must report every working day. Overall compliance: <b>${pct(mx.rate)}</b></div><div style="margin:0 0 10px"><button class="btn" id="bMiss">Missing-report message…</button></div>
+  v.innerHTML=`<div class="card"><h2>Submission matrix${note}</h2><div class="sub">One row per person, one column per day. Click a day heading to mark it as a non-working day (holiday / rain stop). Click a red ✕ to mark that person's day as <b>no report needed</b> (office work, leave, off site…); it is then not counted against compliance. Tick “expected” for people who must report every working day. Overall compliance: <b>${pct(mx.rate)}</b></div><div style="margin:0 0 10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="bMiss">Reminder message…</button><button class="btn pri" id="bShareMx">Share / save matrix…</button></div>
   <div class="scroll"><table class="mx"><thead><tr><th class="who">Personnel</th>${days.map(d=>`<th data-d="${d}" class="${A.isWorkDay(d,S.settings)?'':'off'}" title="${A.fmtDate(d,true)}">${A.fromIso(d).getDate()}<br><span style="font-size:10px">${A.DOW[A.dow(d)].slice(0,2)}</span></th>`).join('')}<th style="cursor:default">Done</th></tr></thead>
   <tbody>${mx.rows.map(r=>`<tr><td class="who"><label><input type="checkbox" data-exp="${esc(r.p.code)}" ${r.p.expected?'checked':''} title="Expected to report every working day"> <b>${esc(r.p.name)}</b></label> <span class="badge">${esc(r.p.role||r.p.code)}</span></td>
-   ${r.cells.map(c=>{ const n=c.rs.length; let cls='c',txt=''; if(n){cls+=' yes';txt=n;} else if(!c.work){cls+=' off';txt='·';} else if(!c.past){cls+=' fut';} else if(r.p.expected){cls+=' miss';txt='✕';}
-     return `<td class="${cls}" ${n?`data-cell="${esc(r.p.code)}|${c.d}"`:''} title="${esc(r.p.name)} · ${A.fmtDate(c.d,true)}">${txt}</td>`; }).join('')}
+   ${r.cells.map(c=>{ const n=c.rs.length; let cls='c',txt=''; if(n){cls+=' yes';txt=n;} else if(!c.work){cls+=' off';txt='·';} else if(!c.past){cls+=' fut';} else if(c.ex){cls+=' off ex';txt='–';} else if(r.p.expected){cls+=' miss';txt='✕';}
+     return `<td class="${cls}" ${n?`data-cell="${esc(r.p.code)}|${c.d}"`:(c.ex||cls.includes('miss'))?`data-nr="${esc(r.p.code)}|${c.d}|${esc(r.p.name)}" style="cursor:pointer"`:''} title="${esc(r.p.name)} · ${A.fmtDate(c.d,true)}${c.ex?' · No report needed: '+esc(c.ex.r):(cls.includes('miss')?' · No report – click if none was needed':'')}">${txt}</td>`; }).join('')}
    <td class="tot">${r.p.expected?`${r.g}/${r.e} days`:`${r.tot} report${r.tot!==1?'s':''}`}</td></tr>`).join('')}</tbody>
   <tfoot><tr><td class="who" style="text-align:right">Reports per day</td>${days.map(d=>`<td>${S.reports.filter(r=>r.date===d).length||''}</td>`).join('')}<td></td></tr></tfoot></table></div>
-  <div class="mx-leg"><span><span class="sw" style="background:var(--ok-bg)"></span>Report received (number = reports that day)</span><span><span class="sw" style="background:var(--bad-bg)"></span>Missing – expected person, working day</span><span><span class="sw" style="background:var(--panel2)"></span>Not expected / blank</span></div></div>`;
-  $('#bMiss').onclick=F.openMissing;
+  <div class="mx-leg"><span><span class="sw" style="background:var(--ok-bg)"></span>Report received (number = reports that day)</span><span><span class="sw" style="background:var(--bad-bg)"></span>No report – expected person, working day</span><span><span class="sw" style="background:var(--panel2)">–</span>No report needed (office work, leave…)</span><span><span class="sw" style="background:var(--panel2)"></span>Not expected / blank</span></div></div>`;
+  $('#bMiss').onclick=F.openMissing; $('#bShareMx').onclick=()=>SN.open('matrix');
   v.querySelectorAll('th[data-d]').forEach(th=>th.onclick=()=>{ const d=th.dataset.d, off=S.settings.daysOff, on=S.settings.daysOn;
     if(A.isWorkDay(d,S.settings)){ if(DEFAULTS.workDays.includes(A.dow(d))) off.push(d); else { const i=on.indexOf(d); if(i>=0) on.splice(i,1); } }
     else { const i=off.indexOf(d); if(i>=0) off.splice(i,1); else on.push(d); }
     saveLS(); render(); });
   v.querySelectorAll('[data-exp]').forEach(cb=>cb.onchange=()=>{ S.settings.expected[cb.dataset.exp]=cb.checked; saveLS(); render(); });
+  v.querySelectorAll('[data-nr]').forEach(td=>td.onclick=()=>{ const [c,d,n]=td.dataset.nr.split('|'); noReport(c,d,n); });
   v.querySelectorAll('[data-cell]').forEach(td=>td.onclick=()=>{ const [c,d]=td.dataset.cell.split('|'); const rs=S.reports.filter(r=>r.code===c&&r.date===d); openList(`${rs[0].reporter} · ${A.fmtDate(d,true)}`, rs); });
+}
+
+const NR_REASONS=['Office work / paperwork','Leave','Off site / meeting','Site not accessible','Not required','Other'];
+function noReport(code,date,name){
+  const cur=(S.settings.excuse||{})[code+'|'+date];
+  drawer(`<h3>No report needed?</h3><p class="sub">${esc(name)} · ${A.fmtDate(date,true)}. Mark this day if no report was due (for example office work). It is then left out of the compliance count and the reminder message.</p>
+   <label class="fld">Reason<select id="nrR">${NR_REASONS.map(r=>`<option ${cur&&cur.r===r?'selected':''}>${r}</option>`).join('')}</select></label>
+   <div style="display:flex;gap:8px;margin-top:12px"><button class="btn pri" id="nrS">Save</button>${cur?'<button class="btn" id="nrX">Remove mark</button>':''}</div>`);
+  $('#nrS').onclick=()=>{ S.settings.excuse=S.settings.excuse||{}; S.settings.excuse[code+'|'+date]={r:$('#nrR').value,t:Date.now()}; saveLS(); closeDrawer(); render(); };
+  const x=$('#nrX'); if(x) x.onclick=()=>{ S.settings.excuse[code+'|'+date]=undefined; delete S.settings.excuse[code+'|'+date]; saveLS(); closeDrawer(); render(); };
 }
 
 function vActs(v){
@@ -373,6 +386,7 @@ function vSet(v){
    <h2 style="margin-top:16px">Links & QR codes</h2><div class="sub">Share the two apps with the team: scan to open on a phone.</div><div style="display:flex;gap:18px;flex-wrap:wrap"><div style="text-align:center"><div id="qrA"></div><div class="sub">SiteBoard (view)</div></div><div style="text-align:center"><div id="qrB"></div><div class="sub">SDR report app</div></div></div>
    <h2 style="margin-top:16px">Report cover logo</h2><div class="sub">Optional. A small logo shown on the cover of weekly and monthly reports.</div>${P.logo?`<img src="${P.logo}" alt="" style="height:40px;background:#fff;border:1px solid var(--line);padding:3px;margin-right:8px">`:''}<input type="file" id="lgF" accept="image/*" style="display:none"><button class="btn" id="lgB">Choose logo</button> ${P.logo?'<button class="btn" id="lgX">Remove</button>':''}
    <h2 style="margin-top:16px">Structure list</h2><div class="sub">${structuresList(S.settings).length} structures in use (${S.settings.setup?'imported from SDR setup.json':'built-in default'}). To update, import the <code>setup.json</code> from the SDR app.</div><input type="file" id="stF" accept=".json" style="display:none"><button class="btn" id="stB">Import SDR setup.json</button> <span class="sub" id="stM"></span>
+   <h2 style="margin-top:16px">Memo numbering</h2><div class="sub">Memo numbers run as prefix / year / running number, e.g. <code>SB/INT/MEMO/2026/001</code>. The running number continues after each memo is downloaded or sent.</div><label class="fld">Prefix<input id="mpre" value="${esc(S.settings.memoPrefix||'SB/INT/MEMO')}"></label>
    <h2 style="margin-top:16px">About</h2><div class="sub">SiteBoard v${VERSION} · ${CREDIT}. Free, runs in your browser; reports never leave your computer.<br>Licence: <a href="LICENSE" target="_blank" rel="noopener">MIT</a> · Third-party software: <a href="THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">notices and licences</a> (pdf.js, jsPDF, docx, SheetJS, qrcode-generator, Barlow / IBM Plex fonts).</div>
    <h2 style="margin-top:16px">Reporting rules</h2><div class="sub">Roles that must report every working day (others report as required).</div><div style="display:flex;gap:14px;flex-wrap:wrap">${roles.map(r=>`<label><input type="checkbox" data-role="${esc(r)}" ${(S.settings.expectedRoles||DEFAULTS.expectedRoles).includes(r)?'checked':''}> ${esc(r)}</label>`).join('')}</div>
    <h2 style="margin-top:16px">Share with team</h2><div class="sub">Project details, reporting rules, non-working days and observation follow-up are saved in <code>siteboard-settings.json</code> in the report folder.</div><button class="btn" id="svShared">Save settings to folder</button> <span id="svMsg" class="sub"></span>
@@ -386,6 +400,7 @@ function vSet(v){
   $('#lgF').onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const im=new Image(); im.onload=()=>{ const k=Math.min(1,160/im.height); const c=document.createElement('canvas'); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k); c.getContext('2d').drawImage(im,0,0,c.width,c.height); S.settings.project.logo=c.toDataURL('image/png'); saveLS(); render(); }; im.src=URL.createObjectURL(f); };
   $('#stB').onclick=()=>$('#stF').click();
   $('#stF').onchange=async(e)=>{ const f=e.target.files[0]; if(!f) return; try{ S.settings.setup=importSetup(JSON.parse(await f.text())); A.setActivityMap(S.settings.setup.actMap||DEFAULT_ACTMAP); saveLS(); render(); $('#stM').textContent='Imported '+S.settings.setup.structures.length+' structures. Use “Save settings to folder” to share.'; }catch(err){ $('#stM').textContent='Could not import: '+err.message; } };
+  $('#mpre').onchange=(e)=>{ S.settings.memoPrefix=e.target.value.trim()||'SB/INT/MEMO'; S.memo=null; saveLS(); };
   $('#th').onchange=(e)=>{ S.settings.theme=e.target.value; applyTheme(); saveLS(); };
   $('#clr').onclick=async()=>{ await dbClear('reports'); await dbClear('photos'); S.lastSig=''; if(S.dirHandle) await refresh(true); else { S.reports=[]; render(); } };
   $('#clrd').onclick=()=>{ S.settings.daysOff=[]; S.settings.daysOn=[]; saveLS(); render(); };
@@ -415,6 +430,7 @@ window.addEventListener('beforeprint',()=>closeDrawer());
 const GL=makeGallery({S,$,drawer,wireCommon,refLink,resolveRange,openReport,saveLS,render});
 const TD=makeToday({S,$,GL});
 const MS=makeMessages({S,$,drawer,closeDrawer,saveLS,refLink,wireCommon,openReport}); S.MS=MS;
+const SN=makeSnapshot({S,$,drawer,resolveRange,inRange,MS,saveLS});
 const F=makeFeatures({S,$,render,drawer,closeDrawer,refLink,wireCommon,saveLS,refresh});
 $('#gs').oninput=(e)=>{ clearTimeout(F._t); F._t=setTimeout(()=>F.openSearch(e.target.value),250); };
 window.__wp12={S,render,fromFiles,F,applyTeam,refresh};

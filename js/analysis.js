@@ -60,9 +60,10 @@ export function matrix(reports, days, settings, today){
     let e=0,g=0,tot=0;
     const cells=days.map(d=>{
       const rs=cell.get(p.code+'|'+d)||[]; const work=isWorkDay(d,settings); const past=d<=today && (!FIRST.get(p.code)||d>=FIRST.get(p.code));
+      const ex=(!rs.length&&settings.excuse&&settings.excuse[p.code+'|'+d])||null; // "no report needed" marked by the admin
       tot+=rs.length;
-      if(p.expected&&work&&past){ e++; if(rs.length) g++; }
-      return { d, rs, work, past };
+      if(p.expected&&work&&past&&!ex){ e++; if(rs.length) g++; }
+      return { d, rs, work, past, ex };
     });
     exp+=e; got+=g; return { p, cells, e, g, tot };
   });
@@ -112,5 +113,5 @@ export function observations(reports){
 }
 export function missingFor(reports,settings,date){
   const ppl=people(reports,settings); const got=new Set(reports.filter(r=>r.date===date).map(r=>r.code));
-  return ppl.filter(p=>p.expected && !got.has(p.code) && (!FIRST.get(p.code)||date>=FIRST.get(p.code)));
+  return ppl.filter(p=>p.expected && !got.has(p.code) && (!FIRST.get(p.code)||date>=FIRST.get(p.code)) && !(settings.excuse&&settings.excuse[p.code+'|'+date]));
 }

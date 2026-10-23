@@ -14,7 +14,7 @@ export async function exportWorkbook(ctx){
   for(const r of ctx.rows){ const it=r.item; act.push([r.date,r.ref,r.reporter,r.role,r.report.team,r.zone,r.act,r.cat,r.bq,r.loc==='-'?'':r.loc,r.ch1!=null?A.fmtCh(r.ch1):'',r.ch2!=null?A.fmtCh(r.ch2):'',it.side||'',r.structure,[it.layer,it.place].filter(Boolean).join(' / '),r.status,r.pct??'',r.rfi,it.time||'',r.remarks]); }
   X.utils.book_append_sheet(wb,sheet(X,act),'Activities');
   const sub=[['Personnel','Role','Expected daily',...ctx.days.map(d=>d.slice(5)),'Reports','Days submitted','Days expected']];
-  for(const r of ctx.mx.rows){ sub.push([r.p.name,r.p.role,r.p.expected?'Yes':'No',...r.cells.map(c=>c.rs.length||(r.p.expected&&c.work&&c.past?'MISSING':'')),r.tot,r.g,r.e]); }
+  for(const r of ctx.mx.rows){ sub.push([r.p.name,r.p.role,r.p.expected?'Yes':'No',...r.cells.map(c=>c.rs.length||(c.ex?'NOT NEEDED':(r.p.expected&&c.work&&c.past?'NO REPORT':''))),r.tot,r.g,r.e]); }
   X.utils.book_append_sheet(wb,sheet(X,sub),'Submissions');
   const rf=[['RFI','First date','Dates','Activity','Location','Items']];
   for(const e of ctx.rfi){ const ds=[...e.dates].sort(); rf.push([e.rfi,ds[0],ds.join(', '),[...e.acts].join('; '),[...e.locs].join('; '),e.n]); }

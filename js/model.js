@@ -52,9 +52,9 @@ function _build(o){
     const head=['Personnel',...days.map(d=>A.fromIso(d).getDate()+'\n'+A.DOW[A.dow(d)].slice(0,2)),'Total'];
     const body=[];
     for(const r of mx.rows){ if(!r.tot && !r.p.expected) continue;
-      body.push([`${r.p.name} (${r.p.role||r.p.code})`,...r.cells.map(c=>{ const n=c.rs.length; const miss=!n&&r.p.expected&&c.work&&c.past; return n?{x:String(n),bg:'E3F3EA'}:miss?{x:'x',bg:'FBE4E1',fg:'B2271B'}:!c.work?{x:'',bg:'EEEEEE'}:''; }),String(r.tot)]); }
+      body.push([`${r.p.name} (${r.p.role||r.p.code})`,...r.cells.map(c=>{ const n=c.rs.length; const miss=!n&&r.p.expected&&c.work&&c.past&&!c.ex; return n?{x:String(n),bg:'E3F3EA'}:c.ex?{x:'-',bg:'EEEEEE'}:miss?{x:'x',bg:'FBE4E1',fg:'B2271B'}:!c.work?{x:'',bg:'EEEEEE'}:''; }),String(r.tot)]); }
     B.push({t:'table',head,rows:body,matrix:true,center:true});
-    B.push({t:'note',x:'Green = report(s) received; red x = no report from an expected person on a working day; grey = non-working day.'});
+    B.push({t:'note',x:'Green = report(s) received; red x = no report from an expected person on a working day; grey = non-working day or no report needed.'});
   } else B.push({t:'note',x:'Period too long to tabulate daily.'});
 
   // 3 works
