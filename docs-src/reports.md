@@ -17,7 +17,7 @@ A **logo** can be added to the cover in Settings. The report is generated on you
 *Export Excel* (top of most pages) saves the period's activities, submissions, RFIs, weather and observations as a workbook.
 
 ## Sharing the matrix and overview
-- On *Submissions* press **Share / save matrix…**; on *Overview* press **Share / save overview…**. A preview image is made for the period chosen at the top of the page.
+- On *Submissions* press **Share / save matrix…**; on *Overview* press **Share / save overview…**. A preview image is made for the period chosen at the top of the page. **Share matrix + map…** opens the Map and combines the matrix with the current map view and filters.
 - The description is written for you (period, compliance, who has no report on which days) and can be edited. Choose **Send via WhatsApp**, **Download image** (PNG), **Download PDF** or **Copy image**.
 - On a computer WhatsApp cannot receive the image from a web page: SiteBoard downloads it and opens WhatsApp, and you attach it with the paperclip (or paste it if you used *Copy image*).
 

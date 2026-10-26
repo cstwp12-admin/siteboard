@@ -1,4 +1,4 @@
-export const VERSION = '0.7.0';
+export const VERSION = '0.8.0';
 export const CREDIT = '© 2026 WPN';
 // Edit this file to tune categories and defaults. No build step needed.
 export const PROJECT = {

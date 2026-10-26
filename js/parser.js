@@ -195,7 +195,7 @@ export function applyEmbedded(report, e){
     const a=chNum(p.ch), b=chNum(p.ch2)??a;
     if(a!=null){ it.ch1=Math.min(a,b); it.ch2=Math.max(a,b); it.side=p.side||it.side; it.zone=zoneOf((a+b)/2);
       it.location='CH '+p.ch+(p.ch2?' - '+p.ch2:'')+(p.side?' '+p.side:''); }
-    it.file=p.file||''; it.place=p.place||''; it.dwg=p.dwg||''; it.result=p.result||''; it.gps=(p.lat&&p.lon)?{lat:+p.lat,lon:+p.lon,ch:p.gch||''}:null;
+    it.file=p.file||''; it.place=p.place||''; it.dwg=p.dwg||''; it.result=p.result||''; { const hasGps=p.lat!=null&&p.lat!==''&&p.lon!=null&&p.lon!==''&&isFinite(+p.lat)&&isFinite(+p.lon); it.gps=hasGps?{lat:+p.lat,lon:+p.lon,ch:p.gch||''}:null; }
     const pg=parseFloat(String(p.prog||'').replace('%','')); it.pct=isFinite(pg)?pg:it.pct;
     it.statusBase=(it.status||'').split(',')[0].replace(/\d+\s*%.*$/,'').trim();
     it.acts=(it.activity||'').split(/\s+\+\s+/).map(x=>x.trim()).filter(Boolean);

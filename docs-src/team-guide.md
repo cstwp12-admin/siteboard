@@ -47,10 +47,17 @@ Project details, who must report daily, non-working days and observation follow-
 - **Photos** shows every photo. Filter by date, reporter, activity, structure, zone, chainage or text. Click a photo to enlarge it; use the arrow keys to move on. *Prepare all thumbnails* makes the gallery load instantly next time.
 - **Structures** lists the bridges, culverts, junction culverts and RS walls with the last record, status and photos. See [Structures and photos](structures).
 
-## 8. Today view
+## 8. Map and map statistics
+- Load the project KMZ/KML once in **Map**. It is kept in this browser for the current workspace.
+- Choose the reporting period at the top. Type a from/to chainage or press **Drag range on map** and drag along the alignment.
+- Turn on **100 m coverage** to see which sections have photographed items. Red rings identify GPS points more than 250 m from the chainage written in the report.
+- Use **Map statistics…** for a shareable PNG/PDF card, or export the filtered pins to KML/GeoJSON for Google Earth or QGIS.
+- **Share matrix + map…** combines the current submission matrix and map in one image.
+
+## 9. Today view
 Open *Today* first thing: who has reported, what was done, which structures were worked and the day's photos. It shows the latest report day if nothing has come in yet today.
 
-## 9. Reports, comments and memos
+## 10. Reports, comments and memos
 - **Generate report** builds the PDF; download it as PDF or Word, or send it by WhatsApp.
 - In **Report files**, open a report and press **Open PDF** to read the original, or **Comment / send via WhatsApp**.
 - **Messages & memo**: send Monitoring, Observation, Action needed or Follow-up messages, design an internal memo (PDF plus WhatsApp announcement) and see what was sent.

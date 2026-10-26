@@ -14,6 +14,7 @@ export function makeSnapshot(ctx){
   const { S, $, drawer, resolveRange, inRange, MS } = ctx;
   const P=()=>({...PROJECT,...(S.settings.project||{})});
   const today=()=>A.iso(new Date());
+  let mapProvider=null;
 
   function header(w,title,sub){
     const p=P();
@@ -95,8 +96,13 @@ export function makeSnapshot(ctx){
   async function build(kind){
     const d=data(); let svg,text;
     if(kind==='overview'){ const o=overviewSvg(d); svg=o.svg; text=overviewText(d,o); } else { svg=matrixSvg(d); text=matrixText(d); }
-    const img=await rasterize(svg,2); const blob=await (await fetch(img.url)).blob();
-    const nm=`SiteBoard ${kind==='overview'?'overview':'matrix'} ${d.from} to ${d.to}`;
+    let img=await rasterize(svg,2), blob=await (await fetch(img.url)).blob();
+    if(kind==='matrix-map'){
+      if(!mapProvider) throw new Error('The map is not available.'); const map=await mapProvider.snapshotForShare(); const a=await createImageBitmap(blob), b=await createImageBitmap(map.blob), gap=24, pad=24, w=Math.max(a.width,b.width)+pad*2, h=a.height+b.height+gap+pad*2;
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const g=cv.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,w,h); g.drawImage(a,(w-a.width)/2,pad); g.drawImage(b,(w-b.width)/2,pad+a.height+gap); a.close&&a.close(); b.close&&b.close();
+      blob=await new Promise((res,rej)=>cv.toBlob(x=>x?res(x):rej(new Error('Could not combine the matrix and map.')),'image/png')); img={url:cv.toDataURL('image/png'),w,h}; text=matrixText(d).replace(/Image attached\.$/,'')+'\n\n'+map.text.replace(/^\*SITE PHOTO MAP\*[^\n]*\n?/,'').replace(/Map image attached\.$/,'')+'\n\nMatrix and map attached as one image.';
+    }
+    const label=kind==='overview'?'overview':kind==='matrix-map'?'matrix and map':'matrix', nm=`SiteBoard ${label} ${d.from} to ${d.to}`;
     return {d,img,blob,text,nm};
   }
   async function pdfOf(r,kind){
@@ -114,20 +120,22 @@ export function makeSnapshot(ctx){
     drawer(`<h3>Share / save</h3><p class="sub" id="snMsg">Preparing preview…</p>`);
     let r; try{ r=await build(kind); }catch(e){ console.error(e); $('#snMsg').textContent='Could not prepare the image: '+e.message; return; }
     const phone=S.settings.waTo||'';
-    drawer(`<h3>Share / save</h3><div class="frm"><label class="fld">Content<select id="snK"><option value="matrix" ${kind==='matrix'?'selected':''}>Submission matrix</option><option value="overview" ${kind==='overview'?'selected':''}>Overview</option></select></label></div>
+    drawer(`<h3>Share / save</h3><div class="frm"><label class="fld">Content<select id="snK"><option value="matrix" ${kind==='matrix'?'selected':''}>Submission matrix</option><option value="matrix-map" ${kind==='matrix-map'?'selected':''}>Submission matrix + map</option><option value="overview" ${kind==='overview'?'selected':''}>Overview</option></select></label></div>
      <p class="sub">Uses the period chosen at the top of the page (${A.fmtDate(r.d.from)} – ${A.fmtDate(r.d.to)}).</p>
      <img src="${r.img.url}" alt="Preview" style="width:100%;border:1px solid var(--line);border-radius:8px;background:#fff">
      <label class="fld" style="margin-top:10px">Description for WhatsApp (editable)<textarea id="snT" rows="9" style="width:100%;font-family:var(--mono,monospace);font-size:12.5px">${esc(r.text)}</textarea></label>
      <label class="fld" style="margin-top:8px">WhatsApp number (optional)<input id="snN" value="${esc(phone)}" placeholder="601XXXXXXXX (empty = choose in WhatsApp)"></label>
      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center"><button class="btn pri" id="snW">Send via WhatsApp</button><button class="btn" id="snP">Download image</button><button class="btn" id="snF">Download PDF</button><button class="btn" id="snC">Copy image</button><span class="sub" id="snMsg" style="margin:0;flex:1 1 200px"></span></div>`);
     $('#snK').onchange=(e)=>open(e.target.value);
-    $('#snP').onclick=()=>{ save(r.nm+'.png',r.blob); S.ISS.record({kind:'Share',type:kind==='overview'?'Overview':'Matrix',subject:r.nm,to:'(downloaded)'},{name:r.nm+'.png',blob:r.blob}); };
-    $('#snF').onclick=async()=>{ try{ const pb=await pdfOf(r,kind); save(r.nm+'.pdf',pb); S.ISS.record({kind:'Share',type:kind==='overview'?'Overview':'Matrix',subject:r.nm,to:'(downloaded)'},{name:r.nm+'.pdf',blob:pb}); }catch(e){ $('#snMsg').textContent='Could not build PDF: '+e.message; } };
+    const shareType=kind==='overview'?'Overview':kind==='matrix-map'?'Matrix + map':'Matrix';
+    $('#snP').onclick=()=>{ save(r.nm+'.png',r.blob); S.ISS.record({kind:'Share',type:shareType,subject:r.nm,to:'(downloaded)'},{name:r.nm+'.png',blob:r.blob}); };
+    $('#snF').onclick=async()=>{ try{ const pb=await pdfOf(r,kind); save(r.nm+'.pdf',pb); S.ISS.record({kind:'Share',type:shareType,subject:r.nm,to:'(downloaded)'},{name:r.nm+'.pdf',blob:pb}); }catch(e){ $('#snMsg').textContent='Could not build PDF: '+e.message; } };
     $('#snC').onclick=async()=>{ try{ await navigator.clipboard.write([new ClipboardItem({'image/png':r.blob})]); $('#snMsg').textContent='Image copied. Paste it into WhatsApp with Ctrl+V.'; }catch(_){ $('#snMsg').textContent='This browser cannot copy images. Use Download image.'; } };
     $('#snW').onclick=async()=>{ const b=$('#snW'); b.disabled=true; const num=$('#snN').value; S.settings.waTo=num; ctx.saveLS();
       try{ const res=await sendWhatsApp({text:$('#snT').value,files:[{name:r.nm+'.png',blob:r.blob}],phone:num}); $('#snMsg').textContent=res.msg;
-        if(res.mode!=='cancelled') S.ISS.record({kind:'Share',type:kind==='overview'?'Overview':'Matrix',subject:r.nm,to:num||'(chosen in WhatsApp)'},{name:r.nm+'.png',blob:r.blob}); }catch(e){ $('#snMsg').textContent='Could not send: '+e.message; }
+        if(res.mode!=='cancelled') S.ISS.record({kind:'Share',type:shareType,subject:r.nm,to:num||'(chosen in WhatsApp)'},{name:r.nm+'.png',blob:r.blob}); }catch(e){ $('#snMsg').textContent='Could not send: '+e.message; }
       b.disabled=false; };
   }
-  return { open };
+  const setMapProvider=(api)=>{ mapProvider=api; };
+  return { open, setMapProvider };
 }

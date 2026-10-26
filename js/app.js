@@ -209,7 +209,7 @@ function vSubs(v){
   let days=A.dateRange(from,to); let note='';
   if(days.length>62){ days=days.slice(-62); note=' (showing last 62 days)'; }
   const mx=A.matrix(S.reports.filter(r=>r.date>=days[0]&&r.date<=days.at(-1)),days,S.settings,t);
-  v.innerHTML=`<div class="card"><h2>Submission matrix${note}</h2><div class="sub">One row per person, one column per day. Click a day heading to mark it as a non-working day (holiday / rain stop). Click a red ✕ to mark that person's day as <b>no report needed</b> (office work, leave, off site…); it is then not counted against compliance. Tick “expected” for people who must report every working day. Overall compliance: <b>${pct(mx.rate)}</b></div><div style="margin:0 0 10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="bMiss">Reminder message…</button><button class="btn pri" id="bShareMx">Share / save matrix…</button></div>
+  v.innerHTML=`<div class="card"><h2>Submission matrix${note}</h2><div class="sub">One row per person, one column per day. Click a day heading to mark it as a non-working day (holiday / rain stop). Click a red ✕ to mark that person's day as <b>no report needed</b> (office work, leave, off site…); it is then not counted against compliance. Tick “expected” for people who must report every working day. Overall compliance: <b>${pct(mx.rate)}</b></div><div style="margin:0 0 10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="bMiss">Reminder message…</button><button class="btn pri" id="bShareMx">Share / save matrix…</button><button class="btn" id="bShareMxMap">Share matrix + map…</button></div>
   <div class="scroll"><table class="mx"><thead><tr><th class="who">Personnel</th>${days.map(d=>`<th data-d="${d}" class="${A.isWorkDay(d,S.settings)?'':'off'}" title="${A.fmtDate(d,true)}">${A.fromIso(d).getDate()}<br><span style="font-size:10px">${A.DOW[A.dow(d)].slice(0,2)}</span></th>`).join('')}<th style="cursor:default">Done</th></tr></thead>
   <tbody>${mx.rows.map(r=>`<tr><td class="who"><label><input type="checkbox" data-exp="${esc(r.p.code)}" ${r.p.expected?'checked':''} title="Expected to report every working day"> <b>${esc(r.p.name)}</b></label> <span class="badge">${esc(r.p.role||r.p.code)}</span></td>
    ${r.cells.map(c=>{ const n=c.rs.length; let cls='c',txt=''; if(n){cls+=' yes';txt=n;} else if(!c.work){cls+=' off';txt='·';} else if(!c.past){cls+=' fut';} else if(c.ex){cls+=' off ex';txt='–';} else if(r.p.expected){cls+=' miss';txt='✕';}
@@ -217,7 +217,7 @@ function vSubs(v){
    <td class="tot">${r.p.expected?`${r.g}/${r.e} days`:`${r.tot} report${r.tot!==1?'s':''}`}</td></tr>`).join('')}</tbody>
   <tfoot><tr><td class="who" style="text-align:right">Reports per day</td>${days.map(d=>`<td>${S.reports.filter(r=>r.date===d).length||''}</td>`).join('')}<td></td></tr></tfoot></table></div>
   <div class="mx-leg"><span><span class="sw" style="background:var(--ok-bg)"></span>Report received (number = reports that day)</span><span><span class="sw" style="background:var(--bad-bg)"></span>No report – expected person, working day</span><span><span class="sw" style="background:var(--panel2)">–</span>No report needed (office work, leave…)</span><span><span class="sw" style="background:var(--panel2)"></span>Not expected / blank</span></div></div>`;
-  $('#bMiss').onclick=F.openMissing; $('#bShareMx').onclick=()=>SN.open('matrix');
+  $('#bMiss').onclick=F.openMissing; $('#bShareMx').onclick=()=>SN.open('matrix'); $('#bShareMxMap').onclick=()=>MP.openMatrixMap();
   v.querySelectorAll('th[data-d]').forEach(th=>th.onclick=()=>{ const d=th.dataset.d, off=S.settings.daysOff, on=S.settings.daysOn;
     if(A.isWorkDay(d,S.settings)){ if(DEFAULTS.workDays.includes(A.dow(d))) off.push(d); else { const i=on.indexOf(d); if(i>=0) on.splice(i,1); } }
     else { const i=off.indexOf(d); if(i>=0) off.splice(i,1); else on.push(d); }
@@ -473,9 +473,10 @@ const ISS=makeIssued({S,$,drawer,saveLS,render}); S.ISS=ISS;
 const MS=makeMessages({S,$,drawer,closeDrawer,saveLS,refLink,wireCommon,openReport,ISS}); S.MS=MS;
 const MP=makeMap({S,$,drawer,resolveRange,inRange,MS,openReport,saveLS,render});
 const SN=makeSnapshot({S,$,drawer,resolveRange,inRange,MS,saveLS});
+MP.setSnapshot(SN); SN.setMapProvider(MP);
 const F=makeFeatures({S,$,render,drawer,closeDrawer,refLink,wireCommon,saveLS,refresh});
 $('#gs').oninput=(e)=>{ clearTimeout(F._t); F._t=setTimeout(()=>F.openSearch(e.target.value),250); };
-window.__wp12={S,render,fromFiles,F,applyTeam,refresh};
+window.__wp12={S,render,fromFiles,F,MP,SN,applyTeam,refresh};
 A.setActivityMap((S.settings.setup&&S.settings.setup.actMap)||DEFAULT_ACTMAP);
 $('#menu').onclick=()=>document.body.classList.toggle('nav-open'); $('#navbg').onclick=()=>document.body.classList.remove('nav-open');
 $('#thm').onclick=()=>{ const dark=document.documentElement.dataset.theme?document.documentElement.dataset.theme==='dark':matchMedia('(prefers-color-scheme:dark)').matches; S.settings.theme=dark?'light':'dark'; applyTheme(); saveLS(); };
