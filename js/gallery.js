@@ -15,7 +15,7 @@ export function makeGallery(ctx){
   const opt=(arr,cur,all)=>`<option value="">${all}</option>`+arr.map(x=>{ const [v,l]=Array.isArray(x)?x:[x,x]; return `<option value="${esc(v)}" ${cur===v?'selected':''}>${esc(l)}</option>`; }).join('');
 
   function allPhotos(){
-    const out=[]; for(const r of S.reports) for(const it of r.items){ if(!it.photo||(it.activity===''&&!it.photo)) continue; out.push({r,it,date:r.date,cat:catOf(it),codes:A.structureCodes(it.structure)||[]}); }
+    const out=[]; for(const r of S.reports) for(const it of r.items){ if(!it.photo||(it.activity===''&&!it.photo)) continue; out.push({r,it,date:r.date,cat:catOf(it),zone:A.zoneForItem(it),codes:A.structureCodes(it.structure)||[]}); }
     out.sort((a,b)=>b.date.localeCompare(a.date)||a.r.ref.localeCompare(b.r.ref)||a.it.no-b.it.no); return out;
   }
   function filtered(all){
@@ -23,7 +23,7 @@ export function makeGallery(ctx){
     return all.filter(p=>{
       if(G.from&&p.date<G.from) return false; if(G.to&&p.date>G.to) return false;
       if(G.who&&p.r.code!==G.who) return false; if(G.cat&&p.cat!==G.cat) return false;
-      if(G.zone&&(p.it.zone||'')!==G.zone) return false;
+      if(G.zone&&p.zone!==G.zone) return false;
       if(G.struct&&!p.codes.includes(G.struct)) return false;
       if(c1!=null&&(p.it.ch2==null||p.it.ch2<c1)) return false; if(c2!=null&&(p.it.ch1==null||p.it.ch1>c2)) return false;
       if(G.rem&&!(p.it.remarks||'').trim()) return false;
@@ -43,7 +43,7 @@ export function makeGallery(ctx){
     const all=allPhotos();
     if(!G.init){ const {from,to}=resolveRange(); G.from=from; G.to=to; G.init=true; }
     const people=[...new Map(S.reports.map(r=>[r.code,r.reporter])).entries()].sort((a,b)=>a[1].localeCompare(b[1]));
-    const cats=CAT_ORDER.filter(c=>all.some(p=>p.cat===c)); const zones=[...new Set(all.map(p=>p.it.zone).filter(Boolean))].sort();
+    const cats=CAT_ORDER.filter(c=>all.some(p=>p.cat===c)); const zones=[...new Set(all.map(p=>p.zone).filter(Boolean))].sort();
     const codes=[...new Set(all.flatMap(p=>p.codes))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
     v.innerHTML=`<div class="card"><div class="frm" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
       <label class="fld">From<input type="date" id="gF" value="${G.from}"></label><label class="fld">To<input type="date" id="gT" value="${G.to}"></label>

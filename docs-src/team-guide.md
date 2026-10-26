@@ -48,7 +48,8 @@ Project details, who must report daily, non-working days and observation follow-
 - **Structures** lists the bridges, culverts, junction culverts and RS walls with the last record, status and photos. See [Structures and photos](structures).
 
 ## 8. Map and map statistics
-- Load the project KMZ/KML once in **Map**. It is kept in this browser for the current workspace.
+- Import the project's SDR `setup.json` in **Settings**. SiteBoard uses its chainage, zones and centreline automatically. WP12 is already built in as the safe default.
+- A KMZ/KML in **Map** is optional. It is kept in this browser for the current workspace and can add ROW boundaries and points of interest, or provide an alignment when the setup has no centreline.
 - Choose the reporting period at the top. Type a from/to chainage or press **Drag range on map** and drag along the alignment.
 - Turn on **100 m coverage** to see which sections have photographed items. Red rings identify GPS points more than 250 m from the chainage written in the report.
 - Use **Map statistics…** for a shareable PNG/PDF card, or export the filtered pins to KML/GeoJSON for Google Earth or QGIS.

@@ -82,7 +82,7 @@ function _build(o){
     B.push({t:'note',x:`Location of photographed works along ${P.chainage}. Colour shows the dominant activity category per 100 m; stronger colour = more records.`});
     B.push({t:'chart',svg:strip(bins,{w:720}),cats:usedCats});
     const body=[];
-    for(const z of ['Zone 1','Zone 2','Zone 3','Zone 4']){ const zr=rows.filter(r=>r.zone===z); body.push([z,...usedCats.map(c=>String(zr.filter(r=>r.cat===c).length||'–')),String(zr.length)]); }
+    for(const z of A.ALIGN.zones.map(z=>z.id)){ const zr=rows.filter(r=>r.zone===z); body.push([z,...usedCats.map(c=>String(zr.filter(r=>r.cat===c).length||'–')),String(zr.length)]); }
     const nz=rows.filter(r=>!r.zone).length; if(nz) body.push(['No chainage given',...usedCats.map(c=>String(rows.filter(r=>!r.zone&&r.cat===c).length||'–')),String(nz)]);
     B.push({t:'table',head:['Zone',...usedCats,'Total'],rows:body,num:usedCats.map((_,i)=>i+1).concat([usedCats.length+1])});
     const sc=new Map(); for(const r of rows) for(const code of A.structureCodes(r.structure)){ const e=sc.get(code)||{n:0,acts:new Set(),last:''}; e.n++; e.acts.add(r.act); if(r.date>e.last) e.last=r.date; sc.set(code,e); }
@@ -128,7 +128,7 @@ function _build(o){
   }
   model.photos=(photos||[]).map((p,i)=>({report:p.report,item:p.item,no:i+1,
     cap:`Photo ${i+1} — ${p.item.activity}`,
-    sub:`${A.fmtDate(p.report.date)}${p.item.time?' '+p.item.time:''} · ${p.item.location&&p.item.location!=='-'?p.item.location:'location n/a'}${p.item.zone?' · '+p.item.zone:''}`,
+    sub:`${A.fmtDate(p.report.date)}${p.item.time?' '+p.item.time:''} · ${p.item.location&&p.item.location!=='-'?p.item.location:'location n/a'}${A.zoneForItem(p.item)?' · '+A.zoneForItem(p.item):''}`,
     rem:p.item.remarks||'', by:`${p.report.reporter}${p.report.role?', '+p.report.role:''} · ${p.report.ref}`}));
   model.sign=[['Prepared by',S.preparedName,S.preparedTitle],['Checked by',S.checkedName,S.checkedTitle],['Reviewed / Approved by',S.approvedName,S.approvedTitle]];
   return model;

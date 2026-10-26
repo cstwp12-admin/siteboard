@@ -1,5 +1,6 @@
 import { CATS, OTHER, IDLE, RAIN_RE, DEFAULTS } from './config.js';
-import { ALIGN, zoneOf, fmtCh } from './parser.js';
+import { ALIGN, zoneOf, zoneForItem } from './project.js';
+import { fmtCh } from './parser.js';
 
 export const iso=(d)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 export const fromIso=(s)=>{ const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); };
@@ -31,7 +32,7 @@ export function flatten(reports){
     for(const a of acts){
       rows.push({ date:r.date, ref:r.ref, code:r.code, reporter:r.reporter, role:r.role, report:r, item:it,
         act:normAct(a), cat:categorize(a), status:it.statusBase||'', pct:it.pct, bq:it.bq, loc:it.location,
-        ch1:it.ch1, ch2:it.ch2, zone:it.zone||'', structure:it.structure, rfi:it.rfi, remarks:it.remarks });
+        ch1:it.ch1, ch2:it.ch2, zone:zoneForItem(it), structure:it.structure, rfi:it.rfi, remarks:it.remarks });
     }
   }
   return rows;
@@ -99,7 +100,7 @@ export function mergeLocs(list,max=6){
   const u=[...new Set(list)].filter(Boolean); const s=u.slice(0,max).join('; ');
   return u.length>max? s+' (+'+(u.length-max)+' more)' : s;
 }
-export { zoneOf, fmtCh, ALIGN };
+export { zoneOf, zoneForItem, fmtCh, ALIGN };
 
 export const obsKey=(r)=>r.ref+'#'+r.no;
 // Items that need follow-up: status Observation, or any remark written

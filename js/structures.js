@@ -5,6 +5,7 @@ export { DEFAULT_STRUCTURES, DEFAULT_ACTMAP } from './sdr-defaults.js';
 
 import { OTHER, IDLE } from './config.js';
 import { zoneOf, categorize, structureCodes } from './analysis.js';
+import { normalizeProjectGeometry } from './project.js';
 export const GROUPS=['Bridge','Culvert','Junction culvert','Reinforced soil wall'];
 
 export function structuresList(settings){
@@ -20,7 +21,8 @@ export function importSetup(json){
   // SDR activity list -> SiteBoard category (used to classify photos by the exact SDR activity name)
   const CMAP={GEN:'Earthworks',EW:'Earthworks',GT:'Ground treatment',DR:'Drainage & culverts',PV:'Pavement & roadworks',BR:'Piling & structures',RF:'Pavement & roadworks',ES:'Slope protection',TM:OTHER,SH:OTHER,TS:'Survey & QA/QC',QC:'Survey & QA/QC',WX:IDLE.id};
   const actMap={}; for(const a of (Array.isArray(json.activities)?json.activities:[])){ const c=CMAP[a.cat]; if(!c) continue; for(const n of [a.en,a.bm]) if(n) actMap[String(n).toLowerCase().replace(/\s+/g,' ').trim()]=c; }
-  return { structures:st, actMap, importedAt:Date.now(), version:json.version||'' };
+  const geo=normalizeProjectGeometry(json);
+  return { ...geo, structures:st, actMap, version:json.version||'', importedAt:Date.now() };
 }
 
 // ---- matching -------------------------------------------------------------------------------

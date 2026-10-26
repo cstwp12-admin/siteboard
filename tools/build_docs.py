@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Build the documentation site: docs-src/*.md  ->  docs/*.html (+ docs/search.json).
 Same look as the WP12 SDR app docs. Run from the repository root:  python3 tools/build_docs.py
-Needs:  pip install markdown
+Needs:  pip install -r tools/requirements-docs.txt
 Edit the three addresses below once the GitHub Pages site exists."""
 import re, glob, json, html, os, markdown
 
 APP_URL  = 'https://cstwp12-admin.github.io/siteboard/'      # the dashboard
 REPO_URL = 'https://github.com/cstwp12-admin/siteboard'
 SDR_URL  = 'https://cstwp12-admin.github.io/wp12-sdr/'
-VERSION  = 'v0.8.0'
+VERSION  = 'v0.8.1'
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(HERE)
 CSS = open(os.path.join(HERE, 'docs.css'), encoding='utf-8').read()
 

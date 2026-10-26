@@ -20,7 +20,7 @@ Matches by description are marked **(ch.)**. **(ch.?)** means another structure 
 - Both are saved in **Settings → Save settings to folder**, so the whole team sees them.
 
 ### Updating the list
-The SDR setup (version 7) is built in. After it changes, use Settings → **Import SDR setup.json**. The structure list and the SDR activity list (used to classify work categories) are replaced and shared with the team.
+The WP12 SDR setup (version 7) is built in. After it changes, or when starting another project, use Settings → **Import SDR setup.json**. The project range, zones, sections, centreline, structure list and SDR activity list are validated, replaced together and shared with the team. Existing reports and follow-up records are not deleted.
 
 ## Photo gallery
 Filter by date, reporter, activity category, structure, zone, chainage range and text, or show only items with remarks. The large view shows the details, a link to the report, a GPS link (reports from SDR v1.2.6+) and a download button.

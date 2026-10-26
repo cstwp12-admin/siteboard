@@ -13,6 +13,6 @@ Open the dashboard in Chrome, Edge or Brave (Brave: enable `brave://flags/#file-
 Notes are written in Markdown in `docs-src/` and built to `docs/` with `python3 tools/build_docs.py`.
 
 ## Version, licence and credits
-- Version v0.8.0. The version is set in `js/config.js` and `tools/build_docs.py`; see `docs-src/changelog.md` for changes.
+- Version v0.8.1. The version is set in `js/config.js` and `tools/build_docs.py`; see `docs-src/changelog.md` for changes.
 - Licence: MIT, see `LICENSE`. Third-party components: `THIRD_PARTY_NOTICES.md`.
 - Copyright © 2026 WPN.

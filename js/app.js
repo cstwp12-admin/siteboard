@@ -13,6 +13,7 @@ import { makeSnapshot } from './snapshot.js';
 import { makeMap } from './map.js';
 import { makeIssued, DEFAULT_TPL } from './issued.js';
 import { importSetup, structuresList, DEFAULT_ACTMAP } from './structures.js';
+import { setProjectConfig, getProjectConfig, hasImportedGeometry, geometrySignature, chainageLabel } from './project.js';
 import { periodFor, defaultNo } from './report.js';
 import { buildModel, fileBase } from './model.js';
 import { renderPdf } from './render-pdf.js';
@@ -30,6 +31,12 @@ const saveLS=()=>{ try{ localStorage.setItem(LS,JSON.stringify(S.settings)); }ca
 const S={ reportsAll:[], allParsed:[], entries:[], reports:[], errors:[], dirHandle:null, lastSig:'', tab:'today', settings:Object.assign({roster:[],expected:{},daysOff:[],daysOn:[],project:{},signoff:{},theme:'',team:'',expectedRoles:null,observations:{},ws:{},sharedAt:0},loadLS()),
   range:{preset:'all',from:'',to:''}, status:{kind:'idle',text:'No folder connected',busy:false,at:null}, fallbackMode:false,
   gen:{type:'weekly',anchor:'',form:{},cands:[],sel:new Set(),loaded:false}, act:{q:'',cat:'',status:'',all:false} };
+function applyProjectSettings(updateMap=true){
+  const before=geometrySignature(), cfg=setProjectConfig(S.settings.setup);
+  A.setActivityMap((S.settings.setup&&S.settings.setup.actMap)||DEFAULT_ACTMAP);
+  if(updateMap&&before!==geometrySignature(cfg)) MP.applyProjectConfig();
+  return cfg;
+}
 const SDR_URL='https://cstwp12-admin.github.io/wp12-sdr/';
 const loadQR=()=>window.qrcode?Promise.resolve(window.qrcode):new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='vendor/qrcode.js'; sc.onload=()=>res(window.qrcode); sc.onerror=rej; document.head.appendChild(sc); });
 import { HAS_FS, fsNotice } from './browser.js';
@@ -57,7 +64,7 @@ async function runSync(entries){
   setStatus('warn','Reading reports…',true);
   const t0=performance.now();
   const res=await sync(entries,(d,t)=>{ const p=$('#prog i'); if(p) p.style.width=Math.round(100*d/Math.max(t,1))+'%'; setStatus('warn',`Reading reports… ${d}/${t}`,true); });
-  S.reportsAll=res.reports; S.allParsed=res.all; S.entries=entries; S.errors=res.errors; await F.loadShared(); applyTeam();
+  S.reportsAll=res.reports; S.allParsed=res.all; S.entries=entries; S.errors=res.errors; await F.loadShared(); applyProjectSettings(); applyTeam();
   S.lastSig=sigOf(entries);
   setStatus(res.errors.length?'warn':'ok',`${res.reports.length} reports · updated ${new Date().toLocaleTimeString()}`);
   render();
@@ -386,6 +393,7 @@ function clearOut(){ const g=S.gen; for(const k of Object.keys(g.out||{})) URL.r
 // ------------------------------------------------------------------ settings
 function vSet(v){
   const P={...PROJECT,...S.settings.project}; const ppl=A.people(S.reports,S.settings); const roles=[...new Set(['IOW','ARE','RE',...ppl.map(p=>p.role).filter(Boolean)])];
+  const PC=getProjectConfig(), imported=hasImportedGeometry(S.settings.setup), pcSource=imported?'imported SDR setup.json':'packaged WP12 defaults';
   const W=S.settings.ws||{}, PR=getProfile(); const dr=(W.team&&PR.name)?'':'<div class="alert" style="margin-bottom:12px">Set the workspace team and your profile below. They decide the memo numbers, who is shown as the sender and which tools you see.</div>';
   v.innerHTML=`${dr}<div class="grid g2"><div class="card"><h2>Workspace</h2><div class="sub">This reports folder. Shared with the team through <b>Save settings to folder</b>.</div><div class="frm">
    <label class="fld" style="grid-column:1/-1">Workspace name<input id="wsName" value="${esc(wsActive().name)}"></label>
@@ -407,7 +415,7 @@ function vSet(v){
    <p class="sub" style="margin-top:12px">Parsed reports and photo thumbnails are cached in this browser to make loading fast. Clearing the cache forces a full re-read of the folder.</p><button class="btn" id="clr">Clear cached data</button>
    <h2 style="margin-top:16px">Links & QR codes</h2><div class="sub">Share the two apps with the team: scan to open on a phone.</div><div style="display:flex;gap:18px;flex-wrap:wrap"><div style="text-align:center"><div id="qrA"></div><div class="sub">SiteBoard (view)</div></div><div style="text-align:center"><div id="qrB"></div><div class="sub">SDR report app</div></div></div>
    <h2 style="margin-top:16px">Report cover logo</h2><div class="sub">Optional. A small logo shown on the cover of weekly and monthly reports.</div>${P.logo?`<img src="${P.logo}" alt="" style="height:40px;background:#fff;border:1px solid var(--line);padding:3px;margin-right:8px">`:''}<input type="file" id="lgF" accept="image/*" style="display:none"><button class="btn" id="lgB">Choose logo</button> ${P.logo?'<button class="btn" id="lgX">Remove</button>':''}
-   <h2 style="margin-top:16px">Structure list</h2><div class="sub">${structuresList(S.settings).length} structures in use (${S.settings.setup?'imported from SDR setup.json':'built-in default'}). To update, import the <code>setup.json</code> from the SDR app.</div><input type="file" id="stF" accept=".json" style="display:none"><button class="btn" id="stB">Import SDR setup.json</button> <span class="sub" id="stM"></span>
+    <h2 style="margin-top:16px">Project setup &amp; structure list</h2><div class="sub"><b>${esc(PC.projectCode)}</b> · ${esc(chainageLabel(PC))} · ${PC.zones.length} zones · ${structuresList(S.settings).length} structures · ${(PC.centreline||[]).length} centreline points.<br>Using ${esc(pcSource)}${PC.setupVersion!==''?' · setup version '+esc(PC.setupVersion):''}${PC.importedAt?' · imported '+new Date(PC.importedAt).toLocaleString('en-GB'):''}. Importing an SDR <code>setup.json</code> updates project geometry, structures and activity mappings together.</div><input type="file" id="stF" accept=".json" style="display:none"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px"><button class="btn" id="stB">Import SDR setup.json</button>${S.settings.setup?'<button class="btn" id="stD">Restore packaged defaults</button>':''} <span class="sub" id="stM"></span></div>
    <h2 style="margin-top:16px">Memo numbering</h2><div class="sub">Template for this workspace. Tokens: <code>{TEAM}</code> <code>{ROLE}</code> <code>{PROJ}</code> <code>{YEAR}</code> <code>{NNN}</code>. The running number continues per series and is kept in the register.</div><label class="fld">Template<input id="mtpl" value="${esc(S.settings.memoTpl||ISS.tpl())}"></label><div class="sub">Next number: <code id="mnext">${esc(ISS.nextMemoNo())}</code> <button class="btn sm" id="mtplR">Use default</button></div>
    <h2 style="margin-top:16px">About</h2><div class="sub">SiteBoard v${VERSION} · ${CREDIT}. Free, runs in your browser; reports never leave your computer.<br>Licence: <a href="LICENSE" target="_blank" rel="noopener">MIT</a> · Third-party software: <a href="THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">notices and licences</a> (pdf.js, jsPDF, docx, SheetJS, qrcode-generator, Barlow / IBM Plex fonts).</div>
    <h2 style="margin-top:16px">Reporting rules</h2><div class="sub">Roles that must report every working day (others report as required).</div><div style="display:flex;gap:14px;flex-wrap:wrap">${roles.map(r=>`<label><input type="checkbox" data-role="${esc(r)}" ${(S.settings.expectedRoles||DEFAULTS.expectedRoles).includes(r)?'checked':''}> ${esc(r)}</label>`).join('')}</div>
@@ -421,7 +429,8 @@ function vSet(v){
   $('#lgB').onclick=()=>$('#lgF').click(); $('#lgX')&&($('#lgX').onclick=()=>{ S.settings.project.logo=''; saveLS(); render(); });
   $('#lgF').onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const im=new Image(); im.onload=()=>{ const k=Math.min(1,160/im.height); const c=document.createElement('canvas'); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k); c.getContext('2d').drawImage(im,0,0,c.width,c.height); S.settings.project.logo=c.toDataURL('image/png'); saveLS(); render(); }; im.src=URL.createObjectURL(f); };
   $('#stB').onclick=()=>$('#stF').click();
-  $('#stF').onchange=async(e)=>{ const f=e.target.files[0]; if(!f) return; try{ S.settings.setup=importSetup(JSON.parse(await f.text())); A.setActivityMap(S.settings.setup.actMap||DEFAULT_ACTMAP); saveLS(); render(); $('#stM').textContent='Imported '+S.settings.setup.structures.length+' structures. Use “Save settings to folder” to share.'; }catch(err){ $('#stM').textContent='Could not import: '+err.message; } };
+   $('#stF').onchange=async(e)=>{ const f=e.target.files[0]; if(!f) return; try{ const previous=S.settings.setup, setup=importSetup(JSON.parse(await f.text())); const p=S.settings.project=S.settings.project||{}, w=S.settings.ws=S.settings.ws||{}; if((!p.title||p.title===PROJECT.title||(previous&&p.title===previous.projectTitle))&&setup.projectTitle) p.title=setup.projectTitle; if(!p.chainage||p.chainage===PROJECT.chainage||(previous&&p.chainage===chainageLabel(previous))) p.chainage=chainageLabel(setup); if(!w.code||(previous&&w.code===previous.projectCode)) w.code=setup.projectCode||w.code; S.settings.setup=setup; applyProjectSettings(); saveLS(); render(); $('#stM').textContent=`Imported ${setup.structures.length} structures, ${setup.zones.length} zones and ${setup.centreline.length} centreline points. Use “Save settings to folder” to share.`; }catch(err){ $('#stM').textContent='Could not import: '+err.message; } };
+   $('#stD')&&($('#stD').onclick=()=>{ if(!confirm('Restore the packaged WP12 project setup? Reports and manual follow-up records will not be deleted.')) return; const old=S.settings.setup, p=S.settings.project||{}, w=S.settings.ws||{}; if(old&&p.title===old.projectTitle) delete p.title; if(old&&p.chainage===chainageLabel(old)) delete p.chainage; if(old&&w.code===old.projectCode) delete w.code; S.settings.setup=null; applyProjectSettings(); saveLS(); render(); });
   $('#mtpl').onchange=(e)=>{ const t=e.target.value.trim(); S.settings.memoTpl=t&&t.includes('{NNN}')?t:''; if(t&&!t.includes('{NNN}')) alert('The template must contain {NNN}, the running number.'); S.memo=null; saveLS(); render(); };
   $('#mtplR').onclick=()=>{ S.settings.memoTpl=''; S.memo=null; saveLS(); render(); };
   $('#wsName').onchange=(e)=>{ wsRename(wsActive().id,e.target.value); render(); };
@@ -476,8 +485,8 @@ const SN=makeSnapshot({S,$,drawer,resolveRange,inRange,MS,saveLS});
 MP.setSnapshot(SN); SN.setMapProvider(MP);
 const F=makeFeatures({S,$,render,drawer,closeDrawer,refLink,wireCommon,saveLS,refresh});
 $('#gs').oninput=(e)=>{ clearTimeout(F._t); F._t=setTimeout(()=>F.openSearch(e.target.value),250); };
-window.__wp12={S,render,fromFiles,F,MP,SN,applyTeam,refresh};
-A.setActivityMap((S.settings.setup&&S.settings.setup.actMap)||DEFAULT_ACTMAP);
+window.__wp12={S,render,fromFiles,F,MP,SN,applyTeam,refresh,applyProjectSettings};
+applyProjectSettings(false);
 $('#menu').onclick=()=>document.body.classList.toggle('nav-open'); $('#navbg').onclick=()=>document.body.classList.remove('nav-open');
 $('#thm').onclick=()=>{ const dark=document.documentElement.dataset.theme?document.documentElement.dataset.theme==='dark':matchMedia('(prefers-color-scheme:dark)').matches; S.settings.theme=dark?'light':'dark'; applyTheme(); saveLS(); };
 $('#verTag').textContent=`v${VERSION}`;

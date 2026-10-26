@@ -2,16 +2,8 @@
 // Works on text items with positions so it is independent of pdf.js internals.
 
 const MONTHS = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
-
-export const ALIGN = { start: 62700, end: 77508,
-  zones: [ { id:'Zone 1', from:62700, to:64800 }, { id:'Zone 2', from:64800, to:68800 },
-           { id:'Zone 3', from:68800, to:72350 }, { id:'Zone 4', from:72350, to:77508 } ] };
-
-export function zoneOf(ch){
-  if(ch==null) return '';
-  for(const z of ALIGN.zones) if(ch>=z.from && ch<=z.to) return z.id;
-  return '';
-}
+import { ALIGN, zoneOf } from './project.js';
+export { ALIGN, zoneOf } from './project.js';
 export function fmtCh(n){ if(n==null||isNaN(n)) return ''; const k=Math.floor(n/1000), m=Math.round(n-k*1000); return k+'+'+String(m).padStart(3,'0'); }
 
 export async function extractPages(doc){

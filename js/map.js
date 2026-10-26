@@ -8,21 +8,27 @@ import { T, hex, clean, ensureScript, loadPdfLibs, rasterize } from './theme.js'
 import { dbGet, dbPut, dbDel } from './db.js';
 import { loadInto } from './photos.js';
 import { sendWhatsApp } from './messages.js';
+import { getProjectConfig } from './project.js';
 
 // ------------------------------------------------------------------ KMZ / KML
 async function inflateRaw(u8){ const ds=new DecompressionStream('deflate-raw'); const w=ds.writable.getWriter(); w.write(u8); w.close(); return new Uint8Array(await new Response(ds.readable).arrayBuffer()); }
-async function kmlFromBuffer(buf,name){
+export async function kmlFromBuffer(buf,name){
   const u8=new Uint8Array(buf);
   if(!(u8[0]===0x50&&u8[1]===0x4b)) return new TextDecoder().decode(u8);           // plain KML
   const dv=new DataView(buf); let e=u8.length-22; while(e>=0&&dv.getUint32(e,true)!==0x06054b50) e--;
   if(e<0) throw new Error('This does not look like a KMZ file.');
   const n=dv.getUint16(e+10,true); let p=dv.getUint32(e+16,true); const list=[];
+  if(n===0xffff||p===0xffffffff) throw new Error('ZIP64 KMZ is not supported. Export the alignment as plain KML and try again.');
   for(let i=0;i<n;i++){ if(dv.getUint32(p,true)!==0x02014b50) break;
-    const method=dv.getUint16(p+10,true), cs=dv.getUint32(p+20,true), nl=dv.getUint16(p+28,true), el=dv.getUint16(p+30,true), cl=dv.getUint16(p+32,true), lho=dv.getUint32(p+42,true);
-    list.push({name:new TextDecoder().decode(u8.slice(p+46,p+46+nl)),method,cs,lho}); p+=46+nl+el+cl; }
+    const flags=dv.getUint16(p+8,true), method=dv.getUint16(p+10,true), cs=dv.getUint32(p+20,true), nl=dv.getUint16(p+28,true), el=dv.getUint16(p+30,true), cl=dv.getUint16(p+32,true), lho=dv.getUint32(p+42,true);
+    list.push({name:new TextDecoder().decode(u8.slice(p+46,p+46+nl)),flags,method,cs,lho}); p+=46+nl+el+cl; }
   const kmls=list.filter(f=>/\.kml$/i.test(f.name)); if(!kmls.length) throw new Error('No .kml found inside the KMZ.');
   const f=kmls.find(k=>/(^|\/)doc\.kml$/i.test(k.name))||kmls[0];
+  if(f.flags&1) throw new Error('Encrypted KMZ is not supported. Export the alignment as plain KML and try again.');
+  if(f.method!==0&&f.method!==8) throw new Error(`KMZ compression method ${f.method} is not supported. Export the alignment as plain KML and try again.`);
+  if(f.lho===0xffffffff||f.cs===0xffffffff||f.lho+30>u8.length) throw new Error('This KMZ uses unsupported ZIP64 data. Export the alignment as plain KML and try again.');
   const nl2=dv.getUint16(f.lho+26,true), el2=dv.getUint16(f.lho+28,true); const start=f.lho+30+nl2+el2; const data=u8.slice(start,start+f.cs);
+  if(start+f.cs>u8.length) throw new Error('The KMZ is incomplete or damaged. Export the alignment as plain KML and try again.');
   return new TextDecoder().decode(f.method===0?data:await inflateRaw(data));
 }
 const coordsOf=(txt)=>String(txt||'').trim().split(/\s+/).map(s=>s.split(',').map(Number)).filter(a=>a.length>=2&&isFinite(a[0])&&isFinite(a[1])).map(a=>[a[1],a[0]]);
@@ -47,13 +53,14 @@ export function parseKml(text){
 
 // ------------------------------------------------------------------ geometry (local metres)
 const R=6371000, rad=Math.PI/180;
-function makeGeo(k){
+export function makeGeo(k){
   if(!k||!k.line) return null; const L=k.line; const lat0=L[0][0]; const kx=Math.cos(lat0*rad)*111320, ky=110574;
   const xy=L.map(([la,lo])=>[lo*kx,la*ky]); const d=[0]; for(let i=1;i<xy.length;i++) d.push(d[i-1]+Math.hypot(xy[i][0]-xy[i-1][0],xy[i][1]-xy[i-1][1]));
   const nearest=(lat,lon)=>{ const x=lon*kx,y=lat*ky; let bi=0,bd=1e18,bt=0,bx=0,by=0; for(let i=0;i<xy.length-1;i++){ const [x1,y1]=xy[i],[x2,y2]=xy[i+1]; const dx=x2-x1,dy=y2-y1,l2=dx*dx+dy*dy||1; let t=((x-x1)*dx+(y-y1)*dy)/l2; t=Math.max(0,Math.min(1,t)); const px=x1+t*dx,py=y1+t*dy,dd=(x-px)**2+(y-py)**2; if(dd<bd){ bd=dd; bi=i; bt=t; bx=px; by=py; } } return {s:d[bi]+bt*(d[bi+1]-d[bi]),distance:Math.sqrt(bd),ll:[by/ky,bx/kx]}; };
   let ctl=(k.chain||[]).map(c=>({ch:c.ch,s:nearest(c.lat,c.lon).s})).sort((a,b)=>a.ch-b.ch);
   const fwd=[]; for(const c of ctl){ if(!fwd.length||c.s>fwd.at(-1).s) fwd.push(c); } ctl=fwd;       // keep monotonic
   if(ctl.length<2){ const a=A.ALIGN||{}; const c0=a.start??62700, c1=a.end??77508; ctl=[{ch:c0,s:0},{ch:c1,s:d.at(-1)}]; }
+  else if(k.range){ ctl[0].ch=k.range[0]; ctl.at(-1).ch=k.range[1]; }
   const chToS=(ch)=>{ let i=0; if(ch<=ctl[0].ch) i=0; else if(ch>=ctl.at(-1).ch) i=ctl.length-2; else { while(ctl[i+1].ch<ch) i++; } const a=ctl[i],b=ctl[i+1]; const s=a.s+(ch-a.ch)*(b.s-a.s)/((b.ch-a.ch)||1); return Math.max(0,Math.min(d.at(-1),s)); };
   const sToCh=(s)=>{ let i=0; if(s<=ctl[0].s) i=0; else if(s>=ctl.at(-1).s) i=ctl.length-2; else { while(ctl[i+1].s<s) i++; } const a=ctl[i],b=ctl[i+1]; return a.ch+(s-a.s)*(b.ch-a.ch)/((b.s-a.s)||1); };
   const at=(s,off=0)=>{ let lo=0,hi=d.length-1; while(hi-lo>1){ const m=(lo+hi)>>1; if(d[m]<=s) lo=m; else hi=m; } const t=(s-d[lo])/((d[hi]-d[lo])||1); const x=xy[lo][0]+t*(xy[hi][0]-xy[lo][0]), y=xy[lo][1]+t*(xy[hi][1]-xy[lo][1]);
@@ -79,16 +86,18 @@ const canvasBlob=(cv,type='image/png',quality)=>new Promise((res,rej)=>{ try{ cv
 export function makeMap(ctx){
   const { S, $, drawer, resolveRange, inRange, MS, openReport, saveLS, render } = ctx;
   const P=()=>({...PROJECT,...(S.settings.project||{})});
-  const M={ kmz:null, geo:null, map:null, layers:{}, base:'osm', show:{line:true,chain:true,poi:true,row:false,pins:true,coverage:false,gpsWarnings:true}, cat:'', who:'', view:null, groups:[], stat:{}, loaded:false, chFrom:null, chTo:null, dragMode:false, dragStart:null, snapshot:null, pendingMatrix:false };
+  const M={ kmz:null, project:null, geo:null, map:null, layers:{}, base:'osm', show:{line:true,chain:true,poi:true,row:false,pins:true,coverage:false,gpsWarnings:true}, cat:'', who:'', view:null, groups:[], stat:{}, loaded:false, chFrom:null, chTo:null, dragMode:false, dragStart:null, snapshot:null, pendingMatrix:false };
   const kmzKey=()=>`kmz:${(S.settings.ws&&S.settings.ws.id)||'default'}`;
-  const status=()=>M.kmz?`${M.kmz.name} · ${M.kmz.line?(M.geo.total/1000).toFixed(1)+' km alignment':'no alignment line found'} · ${M.kmz.chain.length} chainage marks · ${M.kmz.poi.length} points of interest`:'No KMZ loaded';
+  const status=()=>M.kmz?`${M.kmz.name} · ${M.project?'setup centreline active · ':''}${M.kmz.chain.length} KMZ chainage marks · ${M.kmz.poi.length} points of interest`:M.project?`${M.project.name} · ${(M.geo.total/1000).toFixed(1)} km alignment · ${M.project.chain.length} chainage points`:'No map alignment loaded';
+  function projectGeometry(){ const c=getProjectConfig(), pts=c.centreline||[]; if(pts.length<2) return null; return {name:`${c.projectCode} setup.json centreline`,line:pts.map(p=>[p[1],p[0]]),chain:pts.map(p=>({ch:p[2],lat:p[1],lon:p[0]})),poi:[],row:[],range:[c.chFrom,c.chTo]}; }
+  function useProjectGeometry(force=false){ M.project=projectGeometry(); M.geo=makeGeo(M.project||M.kmz); if(force){ M.chFrom=null; M.chTo=null; } setDefaultRange(force); }
 
   async function ensureLeaflet(){ if(window.L) return; if(!document.querySelector('link[data-lf]')){ const l=document.createElement('link'); l.rel='stylesheet'; l.href='vendor/leaflet/leaflet.css'; l.dataset.lf='1'; document.head.appendChild(l); } await ensureScript('vendor/leaflet/leaflet.js'); }
-  async function restore(){ if(M.loaded) return; M.loaded=true; try{ let k=await dbGet('meta',kmzKey()); if(!k){ k=await dbGet('meta','kmz'); if(k) await dbPut('meta',kmzKey(),k); } if(k&&k.data){ M.kmz=k.data; M.kmz.name=k.name||'KMZ'; M.geo=makeGeo(M.kmz); setDefaultRange(); } }catch(_){} }
+  async function restore(){ if(M.loaded) return; M.loaded=true; try{ let k=await dbGet('meta',kmzKey()); if(!k){ k=await dbGet('meta','kmz'); if(k) await dbPut('meta',kmzKey(),k); } if(k&&k.data){ M.kmz=k.data; M.kmz.name=k.name||'KMZ'; } useProjectGeometry(); }catch(_){ useProjectGeometry(); } }
   async function loadFile(f){
     return loadKmlText(await kmlFromBuffer(await f.arrayBuffer(),f.name),f.name);
   }
-  async function loadKmlText(text,name='alignment.kml',persist=true){ const k=parseKml(text); if(!k.line&&!k.chain.length&&!k.poi.length) throw new Error('No alignment, chainage or points found in this file.'); k.name=name; M.kmz=k; M.geo=makeGeo(k); setDefaultRange(true); if(persist) await dbPut('meta',kmzKey(),{name,data:k,saved:Date.now()}); return status(); }
+  async function loadKmlText(text,name='alignment.kml',persist=true){ const k=parseKml(text); if(!k.line&&!k.chain.length&&!k.poi.length) throw new Error('No alignment, chainage or points found in this file.'); k.name=name; M.kmz=k; useProjectGeometry(true); if(persist) await dbPut('meta',kmzKey(),{name,data:k,saved:Date.now()}); return status(); }
   function setDefaultRange(force=false){ if(!M.geo) return; if(force||M.chFrom==null) M.chFrom=Math.round(M.geo.chMin); if(force||M.chTo==null) M.chTo=Math.round(M.geo.chMax); }
 
   // ---- what to plot
@@ -166,11 +175,11 @@ export function makeMap(ctx){
     const reps=inRange(); const cats=[...new Set(S.reports.flatMap(r=>r.items.map(it=>A.categorize((it.acts&&it.acts[0])||it.activity))))].sort(); const people=[...new Map(S.reports.map(r=>[r.code,r.reporter])).entries()];
     const sel=(arr,cur,all)=>`<option value="">${all}</option>`+arr.map(x=>{ const [a,b]=Array.isArray(x)?x:[x,x]; return `<option value="${esc(a)}" ${cur===a?'selected':''}>${esc(b)}</option>`; }).join('');
     const chk=(id,key,l)=>`<label style="display:inline-flex;gap:4px;align-items:center;margin-right:10px"><input type="checkbox" id="${id}" ${M.show[key]?'checked':''}>${l}</label>`;
-    v.innerHTML=`<div class="card"><h2>Site map</h2><div class="sub">Inspections and photos plotted along the project alignment. Items with GPS in the report are placed by GPS; others by their chainage on the KMZ alignment. The KMZ stays on this computer.</div>
+     v.innerHTML=`<div class="card"><h2>Site map</h2><div class="sub">Inspections and photos plotted along the active project alignment. Items with GPS in the report are placed by GPS; others by chainage. An imported SDR setup centreline is used automatically; an optional KMZ/KML adds ROW and points of interest, and supplies the alignment when the setup has none.</div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0"><button class="btn pri" id="mpK">${M.kmz?'Replace KMZ…':'Load KMZ / KML…'}</button><input type="file" id="mpF" accept=".kmz,.kml" style="display:none">${M.kmz?'<button class="btn" id="mpFg">Forget KMZ</button>':''}<span class="sub" id="mpSt" style="margin:0">${esc(status())}</span></div>
      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px"><label class="fld" style="margin:0">Basemap<select id="mpB">${Object.entries(BASE).map(([k,b])=>`<option value="${k}" ${M.base===k?'selected':''}>${b.name}</option>`).join('')}</select></label>
       <label class="fld" style="margin:0">Category<select id="mpC">${sel(cats,M.cat,'All categories')}</select></label><label class="fld" style="margin:0">Reported by<select id="mpW">${sel(people,M.who,'Everyone')}</select></label>
-      <label class="fld" style="margin:0">From CH<input id="mpCF" value="${M.chFrom!=null?fmtCh(M.chFrom):''}" placeholder="62+700" style="width:92px"></label><label class="fld" style="margin:0">To CH<input id="mpCT" value="${M.chTo!=null?fmtCh(M.chTo):''}" placeholder="77+508" style="width:92px"></label><button class="btn sm" id="mpDr">Drag range on map</button>
+      <label class="fld" style="margin:0">From CH<input id="mpCF" value="${M.chFrom!=null?fmtCh(M.chFrom):''}" placeholder="${fmtCh(A.ALIGN.start)}" style="width:92px"></label><label class="fld" style="margin:0">To CH<input id="mpCT" value="${M.chTo!=null?fmtCh(M.chTo):''}" placeholder="${fmtCh(A.ALIGN.end)}" style="width:92px"></label><button class="btn sm" id="mpDr">Drag range on map</button>
       <span style="flex:1"></span><button class="btn sm" id="mpFl">Zoom to alignment</button><button class="btn sm" id="mpFp">Zoom to photos</button><button class="btn pri" id="mpSts">Map statistics…</button><button class="btn" id="mpSn">Snap map…</button></div>
      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:8px"><label class="fld" style="margin:0;min-width:220px">Find chainage or structure<input id="mpQ" list="mpStructs" placeholder="e.g. 68+500 or B12"><datalist id="mpStructs">${[...new Set(S.reports.flatMap(r=>r.items.flatMap(it=>A.structureCodes(it.structure))))].sort().map(x=>`<option value="${esc(x)}">`).join('')}</datalist></label><button class="btn sm" id="mpFind">Find</button><button class="btn sm" id="mpExG">Export GeoJSON</button><button class="btn sm" id="mpExK">Export KML</button><button class="btn sm" id="mpMx">Share matrix + map…</button><span class="sub" id="mpFindMsg" style="margin:0"></span></div>
      <div style="margin-bottom:8px;font-size:13px">${chk('mpL','line','Alignment')}${chk('mpH','chain','Chainage')}${chk('mpP','poi','Points of interest')}${chk('mpR','row','ROW boundary')}${chk('mpI','pins','Inspections / photos')}${chk('mpCv','coverage','100 m coverage')}${chk('mpGw','gpsWarnings','GPS checks')}</div>
@@ -178,7 +187,7 @@ export function makeMap(ctx){
      <div id="mpLg" style="margin-top:4px;font-size:12.5px"></div>${navigator.onLine===false?'<p class="sub">You appear to be offline: the basemap needs internet, the alignment and pins still show.</p>':''}</div>`;
     $('#mpK').onclick=()=>$('#mpF').click();
     $('#mpF').onchange=async(e)=>{ const f=e.target.files[0]; if(!f) return; $('#mpSt').textContent='Reading '+f.name+'…'; try{ await loadFile(f); M.view=null; render(); }catch(er){ $('#mpSt').textContent='Could not read the file: '+er.message; } };
-    const fg=$('#mpFg'); if(fg) fg.onclick=async()=>{ await dbDel('meta',kmzKey()); M.kmz=null; M.geo=null; M.view=null; M.chFrom=null; M.chTo=null; render(); };
+    const fg=$('#mpFg'); if(fg) fg.onclick=async()=>{ await dbDel('meta',kmzKey()); M.kmz=null; M.view=null; useProjectGeometry(true); render(); };
     try{ await ensureLeaflet(); }catch(e){ $('#mpMap').innerHTML='<p class="sub" style="padding:20px">The map library could not be loaded ('+esc(e.message)+').</p>'; return; }
     if(M.map){ try{ M.map.remove(); }catch(_){} M.map=null; M.layers={}; }
     const L=window.L; const map=M.map=L.map('mpMap',{zoomControl:true,preferCanvas:false,zoomSnap:.5});
@@ -193,7 +202,7 @@ export function makeMap(ctx){
     const applyCh=()=>{ const parse=(x)=>{ const m=/^(?:CH\s*)?(\d+)\s*\+\s*(\d{1,3})$/i.exec(x.trim()); return m?+m[1]*1000+ +m[2]:null; }; let a=parse($('#mpCF').value),b=parse($('#mpCT').value); if(a==null||b==null){ $('#mpFindMsg').textContent='Use chainage such as 68+500.'; return; } if(a>b) [a,b]=[b,a]; M.chFrom=Math.max(M.geo?.chMin??a,a); M.chTo=Math.min(M.geo?.chMax??b,b); $('#mpCF').value=fmtCh(M.chFrom); $('#mpCT').value=fmtCh(M.chTo); $('#mpFindMsg').textContent=''; redraw(); };
     $('#mpCF').onchange=applyCh; $('#mpCT').onchange=applyCh;
     $('#mpFl').onclick=fitLine; $('#mpFp').onclick=fitPins; $('#mpSn').onclick=openSnap; $('#mpSts').onclick=openStats; $('#mpFind').onclick=findPlace; $('#mpQ').onkeydown=e=>{ if(e.key==='Enter') findPlace(); };
-    $('#mpDr').onclick=()=>{ if(!M.geo){ $('#mpFindMsg').textContent='Load the KMZ before selecting a range.'; return; } M.dragMode=!M.dragMode; $('#mpDr').classList.toggle('pri',M.dragMode); $('#mpDr').textContent=M.dragMode?'Drag along the alignment…':'Drag range on map'; map.dragging[M.dragMode?'disable':'enable'](); };
+    $('#mpDr').onclick=()=>{ if(!M.geo){ $('#mpFindMsg').textContent='Import a setup centreline or load a KMZ before selecting a range.'; return; } M.dragMode=!M.dragMode; $('#mpDr').classList.toggle('pri',M.dragMode); $('#mpDr').textContent=M.dragMode?'Drag along the alignment…':'Drag range on map'; map.dragging[M.dragMode?'disable':'enable'](); };
     $('#mpExG').onclick=()=>exportPins('geojson'); $('#mpExK').onclick=()=>exportPins('kml'); $('#mpMx').onclick=openMatrixMap;
     map.on('mousedown',e=>{ if(!M.dragMode||!M.geo) return; M.dragStart=M.geo.project(e.latlng.lat,e.latlng.lng).ch; });
     map.on('mousemove',e=>{ if(M.dragStart==null||!M.dragMode) return; const b=M.geo.project(e.latlng.lat,e.latlng.lng).ch; M.chFrom=Math.round(Math.min(M.dragStart,b)); M.chTo=Math.round(Math.max(M.dragStart,b)); $('#mpCF').value=fmtCh(M.chFrom); $('#mpCT').value=fmtCh(M.chTo); redraw(); });
@@ -208,7 +217,7 @@ export function makeMap(ctx){
   function findPlace(){
     const q=($('#mpQ')?.value||'').trim(), msg=$('#mpFindMsg'); if(!q) return;
     const cm=/^(?:CH\s*)?(\d+)\s*\+\s*(\d{1,3})$/i.exec(q);
-    if(cm){ if(!M.geo){ msg.textContent='Load the KMZ before searching chainage.'; return; } const ch=+cm[1]*1000+ +cm[2]; if(ch<M.geo.chMin||ch>M.geo.chMax){ msg.textContent=`CH ${fmtCh(ch)} is outside this alignment.`; return; } M.map.setView(M.geo.posOfCh(ch),16); msg.textContent=`Showing CH ${fmtCh(ch)}.`; return; }
+    if(cm){ if(!M.geo){ msg.textContent='Import a setup centreline or load a KMZ before searching chainage.'; return; } const ch=+cm[1]*1000+ +cm[2]; if(ch<M.geo.chMin||ch>M.geo.chMax){ msg.textContent=`CH ${fmtCh(ch)} is outside this alignment.`; return; } M.map.setView(M.geo.posOfCh(ch),16); msg.textContent=`Showing CH ${fmtCh(ch)}.`; return; }
     const available=selectedItems().filter(p=>p.ll), ql=q.toLowerCase(); let hits=available.filter(p=>A.structureCodes(p.it.structure).some(c=>c.toLowerCase()===ql)); if(!hits.length) hits=available.filter(p=>(p.it.structure||'').toLowerCase().includes(ql));
     if(!hits.length){ msg.textContent=`No mapped structure matches “${q}” in this period.`; return; }
     M.map.fitBounds(L_bounds(hits.map(p=>p.ll)),{padding:[60,60],maxZoom:17}); msg.textContent=`${hits.length} item${hits.length===1?'':'s'} at ${q}.`;
@@ -254,6 +263,7 @@ export function makeMap(ctx){
     $('#msW').onclick=async()=>{ const b=$('#msW'); b.disabled=true; const num=$('#msN').value; S.settings.waTo=num; saveLS(); try{ const res=await sendWhatsApp({text:$('#msT').value,files:[file],phone:num}); $('#msMsg').textContent=res.msg; if(res.mode!=='cancelled') S.ISS.record({kind:'Share',type:'Map statistics',subject:nm,to:num||'(chosen in WhatsApp)'},file); }catch(e){ $('#msMsg').textContent='Could not send: '+e.message; } b.disabled=false; };
   }
   function setSnapshot(api){ M.snapshot=api; }
+  function applyProjectConfig(){ useProjectGeometry(true); M.view=null; }
   function openMatrixMap(){ if(!M.snapshot) return; if(!M.map||!M.map.getContainer().isConnected){ M.pendingMatrix=true; S.tab='map'; render(); return; } M.snapshot.open('matrix-map'); }
 
   // ---------------------------------------------------------------- snap
@@ -324,5 +334,5 @@ export function makeMap(ctx){
     return {...r,text:summary()};
   }
   const save=(name,blob)=>{ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); };
-  return { vMap, openSnap, openMatrixMap, snapshotForShare, setSnapshot, loadKmlText };
+  return { vMap, openSnap, openMatrixMap, snapshotForShare, setSnapshot, loadKmlText, applyProjectConfig };
 }
