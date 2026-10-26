@@ -100,3 +100,5 @@ iframe.pdfv{width:100%;height:78vh;border:1px solid var(--line);border-radius:8p
 #paperWrap{margin-top:14px;display:none}
 
 table.mx td.ex{color:var(--muted)}
+
+.wschip{display:block;width:calc(100% - 24px);margin:0 12px 8px;text-align:left;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:7px 10px;cursor:pointer;font:600 13px/1.3 inherit}.wschip span{display:block;font-weight:400;font-size:11.5px;color:#C9D3DA}.wschip:hover{background:rgba(255,255,255,.12)}

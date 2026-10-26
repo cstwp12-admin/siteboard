@@ -2,7 +2,7 @@
 
 Site reporting dashboard for the WP12 Pan Borneo Sabah Fasa 1B supervision team. It reads the Site Daily Photo Report PDFs made by the SDR app from a folder on your computer and shows:
 
-Today · Overview · Submission matrix · Activities · Chainage and zones · RFI and weather · Observation follow-up · Photos · Map (KMZ alignment, snap to WhatsApp or memo) · Structures · Report files · Weekly and monthly reports (PDF and Word) · Messages and internal memo (WhatsApp) · Guide · Settings.
+Today · Overview · Submission matrix · Activities · Chainage and zones · RFI and weather · Observation follow-up · Photos · Map (KMZ alignment, snap to WhatsApp or memo) · Structures · Report files · Weekly and monthly reports (PDF and Word) · Messages and internal memo (WhatsApp) · Issued register · Workspaces · Guide · Settings.
 
 Report PDFs never leave your computer: the page reads them locally in the browser. This repository holds the program code only.
 

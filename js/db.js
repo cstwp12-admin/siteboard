@@ -1,4 +1,5 @@
-const NAME='wp12-site-dash', VER=1;
+import { dbName } from './workspace.js';
+const NAME=dbName(), VER=1;
 let _db;
 function open(){ return _db||(_db=new Promise((res,rej)=>{
   const r=indexedDB.open(NAME,VER);

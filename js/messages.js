@@ -5,6 +5,7 @@ import { esc } from './charts.js';
 import { T, hex, clean } from './theme.js';
 import { newDoc, band, frame, PG, CW } from './render-pdf.js';
 import { fileIndex } from './scanner.js';
+import { getProfile, POSITIONS } from './workspace.js';
 import { getFull } from './photos.js';
 
 export const TYPES=[
@@ -42,11 +43,11 @@ export async function sendWhatsApp({text,files=[],phone=''}){
 }
 
 export function makeMessages(ctx){
-  const { S, $, drawer, closeDrawer, saveLS, refLink, wireCommon, openReport } = ctx;
+  const { S, $, drawer, closeDrawer, saveLS, refLink, wireCommon, openReport, ISS } = ctx;
   const P=()=>({...PROJECT,...(S.settings.project||{})});
-  const me=()=>{ const g=S.settings.signoff||{}; return {name:g.preparedName||'',title:g.preparedTitle||''}; };
-  const log=()=>S.settings.msgLog=S.settings.msgLog||[];
-  const addLog=(e)=>{ log().unshift({id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),t:Date.now(),...e}); S.settings.msgLog=log().slice(0,150); saveLS(); };
+  const me=()=>{ const g=S.settings.signoff||{}, p=getProfile(); const pos=(POSITIONS.find(x=>x[0]===p.position)||[])[1]||''; return {name:p.name||g.preparedName||'',title:p.title||(p.name?pos:'')||g.preparedTitle||''}; };
+  const log=()=>ISS.list().filter(e=>e.kind==='Message');
+  const addLog=(e)=>ISS.add({...e,kind:'Message'});
 
   function buildText(f){
     const t=TYPES.find(x=>x[0]===f.type)||TYPES[4]; const p=P(); const m=me();
@@ -98,7 +99,7 @@ export function makeMessages(ctx){
           if(usePdf&&pdfRep){ const fl=fileIndex.get(pdfRep.path); if(fl) files.push({name:pdfRep.path.split('/').pop(),blob:fl}); }
           S.settings.waTo=f.phone; saveLS();
           const r=await sendWhatsApp({text:$('#mx').value,files,phone:f.phone}); msg.textContent=r.msg;
-          if(r.mode!=='cancelled') addLog({kind:'message',type:f.type,priority:f.priority,subject:pre.subject||f.ref||f.location||f.body.slice(0,60),to:f.phone||'(chosen in WhatsApp)',files:files.map(x=>x.name),text:$('#mx').value});
+          if(r.mode!=='cancelled'&&pre.memo) await ISS.record({kind:'Memo',no:pre.memo.no,subject:pre.memo.subject,to:pre.memo.to,type:'WhatsApp'},{name:files[0].name,blob:files[0].blob}); else if(r.mode!=='cancelled') addLog({kind:'message',type:f.type,priority:f.priority,subject:pre.subject||f.ref||f.location||f.body.slice(0,60),to:f.phone||'(chosen in WhatsApp)',files:files.map(x=>x.name),text:$('#mx').value});
         }catch(e){ console.error(e); msg.textContent='Could not send: '+e.message; }
         btn.disabled=false; };
     };
@@ -114,10 +115,8 @@ export function makeMessages(ctx){
   }
 
   // ---------------------------------------------------------------- memo
-  const memoSeq=()=>{ const y=new Date().getFullYear(); const n=(S.settings.memoSeq&&S.settings.memoSeq[y]||0)+1; return {y,n}; };
-  const memoPrefix=()=>(S.settings.memoPrefix||'SB/INT/MEMO').replace(/\/+$/,'');
-  function memoDefaults(){ const s=memoSeq(); const m=me();
-    return {no:`${memoPrefix()}/${s.y}/${String(s.n).padStart(3,'0')}`,date:A.iso(new Date()),to:'All site personnel',from:`${m.name}${m.title?', '+m.title:''}`,cc:'',subject:'',kind:'For information',body:'',actions:'',att:[]}; }
+  function memoDefaults(){ const m=me();
+    return {no:ISS.nextMemoNo(),date:A.iso(new Date()),to:'All site personnel',from:`${m.name}${m.title?', '+m.title:''}`,cc:'',subject:'',kind:'For information',body:'',actions:'',att:[]}; }
 
   async function renderMemo(m){
     const doc=await newDoc(); const p=P();
@@ -159,8 +158,7 @@ export function makeMessages(ctx){
     return L.join('\n').replace(/\n{3,}/g,'\n\n');
   }
 
-  // remember the highest number used per year so the next memo continues the series
-  function useNo(no){ const m=String(no||'').match(/\/(\d{4})\/(\d+)\s*$/); if(!m) return; S.settings.memoSeq=S.settings.memoSeq||{}; S.settings.memoSeq[m[1]]=Math.max(S.settings.memoSeq[m[1]]||0,+m[2]); saveLS(); }
+  const useNo=(no)=>ISS.useNo(no);
   // ---------------------------------------------------------------- Messages tab
   function vMessages(v){
     const M=S.memo=S.memo||memoDefaults();
@@ -177,9 +175,9 @@ export function makeMessages(ctx){
       <div style="margin-top:8px"><b>Attachments</b> <span class="sub">(sent together with the memo)</span>${M.att.map((a,i)=>`<div class="sub" style="margin:3px 0">${esc(a.name)} · ${kb(a.blob.size)} <button class="btn sm" data-rm="${i}">Remove</button></div>`).join('')}<br><input type="file" id="memoF" multiple style="display:none"><button class="btn sm" id="memoFb">Add file…</button></div>
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center"><button class="btn pri" id="memoPrev">Preview memo</button><button class="btn" id="memoDl">Download PDF</button><button class="btn" id="memoWa">Send via WhatsApp…</button><button class="btn" id="memoNew">New memo</button><span class="sub" id="memoMsg" style="margin:0"></span></div>
       <div id="memoView"></div></div></div>
-     <div class="card" style="margin-top:12px"><h2>Sent messages</h2><div class="sub">A record of what was sent from this browser. Shared with the team through “Save settings to folder”.</div>
+     <div class="card" style="margin-top:12px"><h2>Recent messages</h2><div class="sub">The latest messages sent. The full list, with memos and reports, is in the <b>Issued register</b>.</div>
       <div class="scroll"><table class="t"><thead><tr><th>When</th><th>Type</th><th>Subject / reference</th><th>To</th><th>Files</th><th></th></tr></thead><tbody>
-      ${log().slice(0,40).map(e=>`<tr><td>${new Date(e.t).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td><td>${esc(e.type||e.kind)}${e.priority&&e.priority!=='Normal'?` <span class="badge warn">${esc(e.priority)}</span>`:''}</td><td>${esc(e.subject||'')}</td><td>${esc(e.to||'')}</td><td>${(e.files||[]).map(esc).join('<br>')||'–'}</td><td><button class="btn sm" data-re="${e.id}">Resend…</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nothing sent yet.</td></tr>'}</tbody></table></div></div>`;
+      ${log().slice(0,12).map(e=>`<tr><td>${new Date(e.t).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</td><td>${esc(e.type||e.kind)}${e.priority&&e.priority!=='Normal'?` <span class="badge warn">${esc(e.priority)}</span>`:''}</td><td>${esc(e.subject||'')}</td><td>${esc(e.to||'')}</td><td>${(e.files||[]).map(esc).join('<br>')||'–'}</td><td><button class="btn sm" data-re="${e.id}">Resend…</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nothing sent yet.</td></tr>'}</tbody></table></div></div>`;
     v.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>compose({type:b.dataset.q,title:b.dataset.q+' – WhatsApp message'}));
     v.querySelectorAll('[data-m]').forEach(i=>i.oninput=i.onchange=()=>{ M[i.dataset.m]=i.value; });
     v.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{ M.att.splice(+b.dataset.rm,1); vMessages(v); });
@@ -189,7 +187,7 @@ export function makeMessages(ctx){
     const make=async()=>{ if(!need()) return null; $('#memoMsg').textContent='Building memo…'; const r=await renderMemo(M); S.memoOut&&URL.revokeObjectURL(S.memoOut.url); S.memoOut={...r,url:URL.createObjectURL(r.blob)}; $('#memoMsg').textContent=`${r.pages} page${r.pages>1?'s':''}`; return S.memoOut; };
     $('#memoNew').onclick=()=>{ S.memo=null; vMessages(v); };
     $('#memoPrev').onclick=async()=>{ try{ const o=await make(); if(o) $('#memoView').innerHTML=`<iframe class="pdfv" title="Memo preview" src="${o.url}#view=FitH"></iframe><div class="sub"><a href="${o.url}" target="_blank" rel="noopener">Open in new tab</a> if the preview is blank.</div>`; }catch(e){ console.error(e); $('#memoMsg').textContent='Could not build memo: '+e.message; } };
-    $('#memoDl').onclick=async()=>{ try{ const o=await make(); if(o){ download(o.name,o.blob); useNo(M.no); } }catch(e){ $('#memoMsg').textContent='Could not build memo: '+e.message; } };
+    $('#memoDl').onclick=async()=>{ try{ const o=await make(); if(o){ download(o.name,o.blob); useNo(M.no); const dup=ISS.noTaken(M.no); await ISS.record({kind:'Memo',no:M.no,subject:M.subject,to:M.to,type:'PDF'},{name:o.name,blob:o.blob}); $('#memoMsg').textContent=dup?'Saved again in the register (same number).':'Saved in the Issued register.'; } }catch(e){ $('#memoMsg').textContent='Could not build memo: '+e.message; } };
     $('#memoWa').onclick=async()=>{ try{ const o=await make(); if(!o) return;
       compose({title:'Send memo via WhatsApp',type:'General',subject:'Memo: '+M.subject,attach:[{name:o.name,blob:o.blob},...M.att],memo:M,body:'',_text:memoText(M)}); 
       // override the composed text with the formatted announcement

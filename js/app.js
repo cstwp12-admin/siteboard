@@ -11,6 +11,7 @@ import { makeToday } from './today.js';
 import { makeMessages } from './messages.js';
 import { makeSnapshot } from './snapshot.js';
 import { makeMap } from './map.js';
+import { makeIssued, DEFAULT_TPL } from './issued.js';
 import { importSetup, structuresList, DEFAULT_ACTMAP } from './structures.js';
 import { periodFor, defaultNo } from './report.js';
 import { buildModel, fileBase } from './model.js';
@@ -22,10 +23,11 @@ const today=()=>A.iso(new Date());
 document.head.insertAdjacentHTML('beforeend',`<style>${cssCatVars()}</style>`);
 
 // ------------------------------------------------------------------ state
-const LS='wp12dash.v1';
+import { wsActive, wsAll, wsTouch, wsAdd, wsSwitch, wsRename, wsRemove, lsKey, getProfile, setProfile, isAdmin, POSITIONS, TEAMS, ORGS } from './workspace.js';
+const LS=lsKey();
 const loadLS=()=>{ try{ return JSON.parse(localStorage.getItem(LS))||{}; }catch(_){ return {}; } };
 const saveLS=()=>{ try{ localStorage.setItem(LS,JSON.stringify(S.settings)); }catch(_){} };
-const S={ reportsAll:[], allParsed:[], entries:[], reports:[], errors:[], dirHandle:null, lastSig:'', tab:'today', settings:Object.assign({roster:[],expected:{},daysOff:[],daysOn:[],project:{},signoff:{},theme:'',team:'',expectedRoles:null,observations:{},sharedAt:0},loadLS()),
+const S={ reportsAll:[], allParsed:[], entries:[], reports:[], errors:[], dirHandle:null, lastSig:'', tab:'today', settings:Object.assign({roster:[],expected:{},daysOff:[],daysOn:[],project:{},signoff:{},theme:'',team:'',expectedRoles:null,observations:{},ws:{},sharedAt:0},loadLS()),
   range:{preset:'all',from:'',to:''}, status:{kind:'idle',text:'No folder connected',busy:false,at:null}, fallbackMode:false,
   gen:{type:'weekly',anchor:'',form:{},cands:[],sel:new Set(),loaded:false}, act:{q:'',cat:'',status:'',all:false} };
 const SDR_URL='https://cstwp12-admin.github.io/wp12-sdr/';
@@ -85,6 +87,7 @@ async function fromFiles(files){
   await runSync(entries);
 }
 async function boot(){
+  { const ses=S.settings.session; if(ses){ if(ses.tab&&TABS.some(t=>t[0]===ses.tab)) S.tab=ses.tab; if(ses.range&&ses.range.preset) S.range=ses.range; } wsTouch(); ISS.migrate(); ISS.logSession(); }
   // cached reports first, so the dashboard is instant
   const cached=await dbAll('reports'); const {dedupe}=await import('./scanner.js');
   if(cached.length){ S.reportsAll=dedupe(cached.map(([,v])=>v.report).filter(Boolean)); applyTeam(); setStatus('warn','Showing saved data — reconnect folder to refresh'); }
@@ -127,21 +130,26 @@ function renderFilters(){
 }
 
 // ------------------------------------------------------------------ views
-const IC={map:'<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',today:'<path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/>',overview:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',subs:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',acts:'<path d="M4 6h16M4 12h16M4 18h10"/>',chain:'<path d="M3 17l5-5 4 3 8-9"/><path d="M3 21h18"/>',struct:'<path d="M3 20h18M5 20V9l7-5 7 5v11M9 20v-6h6v6"/>',gal:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 9"/>',rfi:'<path d="M7 18a4 4 0 010-8 5 5 0 019.6-1A4 4 0 0117 18z"/>',obs:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>',msg:'<path d="M21 12a8 8 0 01-11.6 7.1L3 21l1.9-5.8A8 8 0 1121 12z"/><path d="M8.5 11h7M8.5 14h4"/>',gen:'<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M9 14h6M9 17h4"/>',reports:'<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',guide:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1-1.5 2M12 17h.01"/>',set:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'};
-const NAV=[['Monitor',[['today','Today'],['overview','Overview'],['subs','Submissions']]],['Site',[['acts','Activities'],['chain','Chainage & zones'],['struct','Structures'],['gal','Photos'],['map','Map'],['rfi','RFI & weather'],['obs','Observations']]],['Reports',[['gen','Generate report'],['msg','Messages & memo'],['reports','Report files']]],['Help',[['guide','Guide'],['set','Settings']]]];
+const IC={reg:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/>',map:'<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',today:'<path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/>',overview:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',subs:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',acts:'<path d="M4 6h16M4 12h16M4 18h10"/>',chain:'<path d="M3 17l5-5 4 3 8-9"/><path d="M3 21h18"/>',struct:'<path d="M3 20h18M5 20V9l7-5 7 5v11M9 20v-6h6v6"/>',gal:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 9"/>',rfi:'<path d="M7 18a4 4 0 010-8 5 5 0 019.6-1A4 4 0 0117 18z"/>',obs:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>',msg:'<path d="M21 12a8 8 0 01-11.6 7.1L3 21l1.9-5.8A8 8 0 1121 12z"/><path d="M8.5 11h7M8.5 14h4"/>',gen:'<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M9 14h6M9 17h4"/>',reports:'<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',guide:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1-1.5 2M12 17h.01"/>',set:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'};
+const NAV=[['Monitor',[['today','Today'],['overview','Overview'],['subs','Submissions']]],['Site',[['acts','Activities'],['chain','Chainage & zones'],['struct','Structures'],['gal','Photos'],['map','Map'],['rfi','RFI & weather'],['obs','Observations']]],['Reports',[['gen','Generate report'],['msg','Messages & memo'],['reg','Issued register'],['reports','Report files']]],['Help',[['guide','Guide'],['set','Settings']]]];
+const ADMIN_TABS=['gen','msg','reg','reports'];
 const TABS=NAV.flatMap(g=>g[1]);
+const navFor=()=>isAdmin()?NAV:NAV.map(([g,items])=>[g,items.filter(i=>!ADMIN_TABS.includes(i[0]))]).filter(([g,items])=>items.length);
 function render(){
   A.setActivityMap((S.settings.setup&&S.settings.setup.actMap)||DEFAULT_ACTMAP);
-  $('#tabs').innerHTML=NAV.map(([g,items])=>`<div class="grp">${g}</div>`+items.map(([k,l])=>`<button data-t="${k}" class="${S.tab===k?'on':''}"><svg viewBox="0 0 24 24">${IC[k]||''}</svg>${l}</button>`).join('')).join('');
+  $('#tabs').innerHTML=navFor().map(([g,items])=>`<div class="grp">${g}</div>`+items.map(([k,l])=>`<button data-t="${k}" class="${S.tab===k?'on':''}"><svg viewBox="0 0 24 24">${IC[k]||''}</svg>${l}</button>`).join('')).join('');
   $('#tabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{S.tab=b.dataset.t;document.body.classList.remove('nav-open');render();window.scrollTo(0,0);});
+  if(!isAdmin()&&ADMIN_TABS.includes(S.tab)) S.tab='today';
   const P0={...PROJECT,...S.settings.project}; $('#proj').textContent=P0.chainage||P0.subtitle||'Site daily reports';
+  { const w=S.settings.ws||{}, pr=getProfile(); const c=$('#wsChip'); if(c){ c.innerHTML=`<b>${esc(w.team||'Set up workspace')}</b>${w.code?' · '+esc(w.code):''}<span>${esc(pr.name?pr.name+(pr.position?' · '+pr.position:''):'Set your profile')}</span>`; c.onclick=openWorkspaces; } }
+  { const ss=JSON.stringify({tab:S.tab,range:S.range}); if(ss!==S._ss){ S._ss=ss; S.settings.session={tab:S.tab,range:S.range}; saveLS(); } }
   $('#ptitle').textContent=(TABS.find(t=>t[0]===S.tab)||[])[1]||'';
   { const ds=S.reports.map(r=>r.date).sort(); $('#pmeta').textContent=ds.length?`${S.reports.length} reports · ${A.fmtShort(ds[0])} – ${A.fmtDate(ds.at(-1))}${S.status.at?' · updated '+new Date(S.status.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):''}`:'No reports loaded'; }
   renderTop(); renderFilters();
   $('#filters').style.display = ['set','gen','msg','reports','guide','obs','gal','struct','today'].includes(S.tab)?'none':'flex';
   const v=$('#view'); if(S.tab==='gen') drawPreview(); else { $('#paperWrap').style.display='none'; }
   if(!S.reports.length && S.tab!=='set'){ v.innerHTML=emptyView(); wireDrop(); return; }
-  ({overview:vOverview,subs:vSubs,acts:vActs,chain:vChain,rfi:vRfi,reports:vReports,gen:vGen,msg:MS.vMessages,set:vSet,obs:F.vObs,guide:F.vGuide,gal:GL.vGallery,map:MP.vMap,struct:GL.vStructures,today:TD.vToday}[S.tab])(v);
+  ({overview:vOverview,subs:vSubs,acts:vActs,chain:vChain,rfi:vRfi,reports:vReports,gen:vGen,msg:MS.vMessages,reg:ISS.vRegister,set:vSet,obs:F.vObs,guide:F.vGuide,gal:GL.vGallery,map:MP.vMap,struct:GL.vStructures,today:TD.vToday}[S.tab])(v);
   wireCommon(v);
 }
 function emptyView(){
@@ -369,8 +377,8 @@ function drawPreview(){
   w.style.display='block';
   w.innerHTML=`<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><b>Report preview</b><span class="sp"></span><button class="btn pri" id="dlPdf">Download PDF</button><button class="btn" id="dlDocx">Download Word</button><button class="btn" id="opPdf">Open in new tab</button><button class="btn" id="waPdf">Send via WhatsApp…</button></div>
    <div class="sub" style="margin:6px 0">${esc(o.name)}</div><iframe class="pdfv" title="Report preview" src="${o.url}#view=FitH"></iframe><div class="sub" id="pvNote">If the preview stays blank in your browser, use “Open in new tab”.</div></div>`;
-  $('#dlPdf').onclick=()=>saveBlob(o); $('#opPdf').onclick=()=>window.open(o.url,'_blank');
-  $('#dlDocx').onclick=async(e)=>{ const b=e.target; b.disabled=true; b.textContent='Building Word…'; try{ if(!g.out.docx){ const res=await renderDocx(g.model,opts($('#pvNote'))); setOut('docx',res); } saveBlob(g.out.docx); }catch(er){ console.error(er); $('#pvNote').textContent='Word export failed: '+er.message; } b.disabled=false; b.textContent='Download Word'; };
+  $('#dlPdf').onclick=()=>{ saveBlob(o); ISS.record({kind:'Report',no:g.model.no||'',subject:g.model.title+' ('+g.model.period+')',type:'PDF'},{name:o.name,blob:o.blob}); }; $('#opPdf').onclick=()=>window.open(o.url,'_blank');
+  $('#dlDocx').onclick=async(e)=>{ const b=e.target; b.disabled=true; b.textContent='Building Word…'; try{ if(!g.out.docx){ const res=await renderDocx(g.model,opts($('#pvNote'))); setOut('docx',res); } saveBlob(g.out.docx); ISS.record({kind:'Report',no:g.model.no||'',subject:g.model.title+' ('+g.model.period+')',type:'Word'},{name:g.out.docx.name,blob:g.out.docx.blob}); }catch(er){ console.error(er); $('#pvNote').textContent='Word export failed: '+er.message; } b.disabled=false; b.textContent='Download Word'; };
   $('#waPdf').onclick=()=>MS.compose({type:'Report',attach:[{name:o.name,blob:o.blob}],text:`${g.model.no} ${g.model.title}\n${g.model.period}`});
 }
 function clearOut(){ const g=S.gen; for(const k of Object.keys(g.out||{})) URL.revokeObjectURL(g.out[k].url); g.out=null; g.model=null; }
@@ -378,7 +386,20 @@ function clearOut(){ const g=S.gen; for(const k of Object.keys(g.out||{})) URL.r
 // ------------------------------------------------------------------ settings
 function vSet(v){
   const P={...PROJECT,...S.settings.project}; const ppl=A.people(S.reports,S.settings); const roles=[...new Set(['IOW','ARE','RE',...ppl.map(p=>p.role).filter(Boolean)])];
-  v.innerHTML=`<div class="grid g2"><div class="card"><h2>Project details (used on reports)</h2><div class="sub">Saved in this browser. Use “Save settings to folder” below to share with the team.</div><div class="frm">
+  const W=S.settings.ws||{}, PR=getProfile(); const dr=(W.team&&PR.name)?'':'<div class="alert" style="margin-bottom:12px">Set the workspace team and your profile below. They decide the memo numbers, who is shown as the sender and which tools you see.</div>';
+  v.innerHTML=`${dr}<div class="grid g2"><div class="card"><h2>Workspace</h2><div class="sub">This reports folder. Shared with the team through <b>Save settings to folder</b>.</div><div class="frm">
+   <label class="fld" style="grid-column:1/-1">Workspace name<input id="wsName" value="${esc(wsActive().name)}"></label>
+   <label class="fld">Team<input data-ws="team" list="wsTeams" value="${esc(W.team||'')}" placeholder="CST, WPC, SOR…"><datalist id="wsTeams">${TEAMS.map(t=>`<option>${t}</option>`).join('')}</datalist></label>
+   <label class="fld">Project code<input data-ws="code" value="${esc(W.code||'')}" placeholder="WP12"></label>
+   <label class="fld" style="grid-column:1/-1">Organisation type<select data-ws="org"><option value="">–</option>${ORGS.map(o=>`<option ${W.org===o?'selected':''}>${o}</option>`).join('')}</select></label>
+   <label class="fld" style="grid-column:1/-1">Issuing office (shown on memos)<input data-ws="office" value="${esc(W.office||'')}" placeholder="e.g. Resident Engineer Team WP12"></label></div></div>
+   <div class="card"><h2>My profile</h2><div class="sub">Saved in this browser only. SiteBoard has no passwords: the profile sets your name, your position and what you see.</div><div class="frm">
+   <label class="fld" style="grid-column:1/-1">Name<input id="prN" value="${esc(PR.name)}"></label>
+   <label class="fld">Position<select id="prP"><option value="">–</option>${POSITIONS.map(([k,l])=>`<option value="${k}" ${PR.position===k?'selected':''}>${k} – ${l}</option>`).join('')}</select></label>
+   <label class="fld">Title on memos<input id="prT" value="${esc(PR.title)}" placeholder="${esc((POSITIONS.find(x=>x[0]===PR.position)||[])[1]||'Resident Engineer')}"></label>
+   ${PR.position&&!(POSITIONS.find(x=>x[0]===PR.position)||[])[2]?`<label style="grid-column:1/-1"><input type="checkbox" id="prA" ${PR.showAdmin?'checked':''}> Show administrator tools (reports, messages, register)</label>`:''}</div>
+   <p class="sub" style="margin-top:8px">${isAdmin()?'Administrator view: all tools are shown.':'Member view: report-making and messaging tools are hidden.'}</p></div>
+   <div class="card"><h2>Project details (used on reports)</h2><div class="sub">Saved in this browser. Use “Save settings to folder” below to share with the team.</div><div class="frm">
    ${[['title','Project title'],['subtitle','Sub-title'],['chainage','Section of works'],['consultant','Consultant'],['contractor','Contractor'],['team','Team']].map(([k,l])=>`<label class="fld" style="grid-column:1/-1">${l}<input data-p="${k}" value="${esc(P[k])}"></label>`).join('')}</div></div>
    <div class="card"><h2>Personnel roster</h2><div class="sub">Detected from the report reference code. Tick “expected” for people who must submit every working day. The role comes from the report (IOW / ARE).</div><table class="t"><thead><tr><th>Code</th><th>Name</th><th>Role</th><th>Expected</th><th class="num">Reports</th></tr></thead><tbody>
    ${ppl.map(p=>`<tr><td>${esc(p.code)}</td><td>${esc(p.name)}</td><td>${esc(p.role)}</td><td><input type="checkbox" data-e="${esc(p.code)}" ${p.expected?'checked':''}></td><td class="num">${p.count}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">Connect a folder first.</td></tr>'}</tbody></table></div>
@@ -387,7 +408,7 @@ function vSet(v){
    <h2 style="margin-top:16px">Links & QR codes</h2><div class="sub">Share the two apps with the team: scan to open on a phone.</div><div style="display:flex;gap:18px;flex-wrap:wrap"><div style="text-align:center"><div id="qrA"></div><div class="sub">SiteBoard (view)</div></div><div style="text-align:center"><div id="qrB"></div><div class="sub">SDR report app</div></div></div>
    <h2 style="margin-top:16px">Report cover logo</h2><div class="sub">Optional. A small logo shown on the cover of weekly and monthly reports.</div>${P.logo?`<img src="${P.logo}" alt="" style="height:40px;background:#fff;border:1px solid var(--line);padding:3px;margin-right:8px">`:''}<input type="file" id="lgF" accept="image/*" style="display:none"><button class="btn" id="lgB">Choose logo</button> ${P.logo?'<button class="btn" id="lgX">Remove</button>':''}
    <h2 style="margin-top:16px">Structure list</h2><div class="sub">${structuresList(S.settings).length} structures in use (${S.settings.setup?'imported from SDR setup.json':'built-in default'}). To update, import the <code>setup.json</code> from the SDR app.</div><input type="file" id="stF" accept=".json" style="display:none"><button class="btn" id="stB">Import SDR setup.json</button> <span class="sub" id="stM"></span>
-   <h2 style="margin-top:16px">Memo numbering</h2><div class="sub">Memo numbers run as prefix / year / running number, e.g. <code>SB/INT/MEMO/2026/001</code>. The running number continues after each memo is downloaded or sent.</div><label class="fld">Prefix<input id="mpre" value="${esc(S.settings.memoPrefix||'SB/INT/MEMO')}"></label>
+   <h2 style="margin-top:16px">Memo numbering</h2><div class="sub">Template for this workspace. Tokens: <code>{TEAM}</code> <code>{ROLE}</code> <code>{PROJ}</code> <code>{YEAR}</code> <code>{NNN}</code>. The running number continues per series and is kept in the register.</div><label class="fld">Template<input id="mtpl" value="${esc(S.settings.memoTpl||ISS.tpl())}"></label><div class="sub">Next number: <code id="mnext">${esc(ISS.nextMemoNo())}</code> <button class="btn sm" id="mtplR">Use default</button></div>
    <h2 style="margin-top:16px">About</h2><div class="sub">SiteBoard v${VERSION} · ${CREDIT}. Free, runs in your browser; reports never leave your computer.<br>Licence: <a href="LICENSE" target="_blank" rel="noopener">MIT</a> · Third-party software: <a href="THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener">notices and licences</a> (pdf.js, jsPDF, docx, SheetJS, qrcode-generator, Barlow / IBM Plex fonts).</div>
    <h2 style="margin-top:16px">Reporting rules</h2><div class="sub">Roles that must report every working day (others report as required).</div><div style="display:flex;gap:14px;flex-wrap:wrap">${roles.map(r=>`<label><input type="checkbox" data-role="${esc(r)}" ${(S.settings.expectedRoles||DEFAULTS.expectedRoles).includes(r)?'checked':''}> ${esc(r)}</label>`).join('')}</div>
    <h2 style="margin-top:16px">Share with team</h2><div class="sub">Project details, reporting rules, non-working days and observation follow-up are saved in <code>siteboard-settings.json</code> in the report folder.</div><button class="btn" id="svShared">Save settings to folder</button> <span id="svMsg" class="sub"></span>
@@ -401,7 +422,12 @@ function vSet(v){
   $('#lgF').onchange=(e)=>{ const f=e.target.files[0]; if(!f) return; const im=new Image(); im.onload=()=>{ const k=Math.min(1,160/im.height); const c=document.createElement('canvas'); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k); c.getContext('2d').drawImage(im,0,0,c.width,c.height); S.settings.project.logo=c.toDataURL('image/png'); saveLS(); render(); }; im.src=URL.createObjectURL(f); };
   $('#stB').onclick=()=>$('#stF').click();
   $('#stF').onchange=async(e)=>{ const f=e.target.files[0]; if(!f) return; try{ S.settings.setup=importSetup(JSON.parse(await f.text())); A.setActivityMap(S.settings.setup.actMap||DEFAULT_ACTMAP); saveLS(); render(); $('#stM').textContent='Imported '+S.settings.setup.structures.length+' structures. Use “Save settings to folder” to share.'; }catch(err){ $('#stM').textContent='Could not import: '+err.message; } };
-  $('#mpre').onchange=(e)=>{ S.settings.memoPrefix=e.target.value.trim()||'SB/INT/MEMO'; S.memo=null; saveLS(); };
+  $('#mtpl').onchange=(e)=>{ const t=e.target.value.trim(); S.settings.memoTpl=t&&t.includes('{NNN}')?t:''; if(t&&!t.includes('{NNN}')) alert('The template must contain {NNN}, the running number.'); S.memo=null; saveLS(); render(); };
+  $('#mtplR').onclick=()=>{ S.settings.memoTpl=''; S.memo=null; saveLS(); render(); };
+  $('#wsName').onchange=(e)=>{ wsRename(wsActive().id,e.target.value); render(); };
+  v.querySelectorAll('[data-ws]').forEach(i=>i.onchange=()=>{ S.settings.ws=S.settings.ws||{}; S.settings.ws[i.dataset.ws]=i.value.trim(); S.memo=null; saveLS(); render(); });
+  { const sp=()=>{ const p=getProfile(); setProfile({...p,name:$('#prN').value.trim(),position:$('#prP').value,title:$('#prT').value.trim(),showAdmin:$('#prA')?$('#prA').checked:p.showAdmin}); S.memo=null; render(); };
+    ['#prN','#prP','#prT'].forEach(k=>$(k).onchange=sp); const pa=$('#prA'); if(pa) pa.onchange=sp; }
   $('#th').onchange=(e)=>{ S.settings.theme=e.target.value; applyTheme(); saveLS(); };
   $('#clr').onclick=async()=>{ await dbClear('reports'); await dbClear('photos'); S.lastSig=''; if(S.dirHandle) await refresh(true); else { S.reports=[]; render(); } };
   $('#clrd').onclick=()=>{ S.settings.daysOff=[]; S.settings.daysOn=[]; saveLS(); render(); };
@@ -421,6 +447,19 @@ async function openReport(ref){
   for(const it of r.items){ const img=$(`#drawer img[data-n="${it.no}"]`); if(!img) continue; loadInto(img,r,it); }
 }
 
+// ------------------------------------------------------------------ workspaces
+function openWorkspaces(){
+  const act=wsActive(); const w=S.settings.ws||{};
+  drawer(`<h3>Workspace</h3><p class="sub">A workspace is one reports folder: for example your CST folder, or the WPC folder you monitor. Each keeps its own project details, team, memo numbering and register. Switching reloads SiteBoard.</p>
+   <table class="t"><tbody>${wsAll().map(x=>`<tr><td><b>${esc(x.name)}</b>${x.id===act.id?' <span class="badge ok">open</span>':''}<div class="sub" style="margin:0">Last used ${new Date(x.last||x.created).toLocaleDateString('en-GB')}</div></td><td style="text-align:right;white-space:nowrap">${x.id===act.id?'':`<button class="btn sm" data-sw="${x.id}">Switch</button> `}<button class="btn sm" data-rn="${x.id}">Rename</button> ${wsAll().length>1&&x.id!==act.id?`<button class="btn sm" data-rm="${x.id}">Remove</button>`:''}</td></tr>`).join('')}</tbody></table>
+   <div class="frm" style="margin-top:12px"><label class="fld" style="grid-column:1/-1">New workspace name<input id="wsN" placeholder="e.g. WPC daily reports"></label></div><button class="btn pri" id="wsAdd" style="margin-top:8px">Create and connect its folder</button>
+   <p class="sub" style="margin-top:12px">After switching, press <b>Connect folder</b> and choose that team's reports folder. Set the team and your profile in Settings.</p>`);
+  document.querySelectorAll('#drawer [data-sw]').forEach(b=>b.onclick=()=>wsSwitch(b.dataset.sw));
+  document.querySelectorAll('#drawer [data-rn]').forEach(b=>b.onclick=()=>{ const n=prompt('Workspace name',wsAll().find(x=>x.id===b.dataset.rn).name); if(n){ wsRename(b.dataset.rn,n); openWorkspaces(); render(); } });
+  document.querySelectorAll('#drawer [data-rm]').forEach(b=>b.onclick=()=>{ if(confirm('Remove this workspace from this browser? The reports folder itself is not touched.')){ wsRemove(b.dataset.rm); openWorkspaces(); } });
+  $('#wsAdd').onclick=()=>{ const id=wsAdd($('#wsN').value||'New workspace'); wsSwitch(id); };
+}
+
 // ------------------------------------------------------------------ tooltip
 const tip=$('#tip');
 document.addEventListener('mousemove',(e)=>{ const t=e.target.closest&&e.target.closest('[data-tip]'); if(!t){ tip.style.display='none'; return; }
@@ -430,7 +469,8 @@ $('#dbg').onclick=closeDrawer;
 window.addEventListener('beforeprint',()=>closeDrawer());
 const GL=makeGallery({S,$,drawer,wireCommon,refLink,resolveRange,openReport,saveLS,render});
 const TD=makeToday({S,$,GL});
-const MS=makeMessages({S,$,drawer,closeDrawer,saveLS,refLink,wireCommon,openReport}); S.MS=MS;
+const ISS=makeIssued({S,$,drawer,saveLS,render}); S.ISS=ISS;
+const MS=makeMessages({S,$,drawer,closeDrawer,saveLS,refLink,wireCommon,openReport,ISS}); S.MS=MS;
 const MP=makeMap({S,$,drawer,resolveRange,inRange,MS,openReport,saveLS,render});
 const SN=makeSnapshot({S,$,drawer,resolveRange,inRange,MS,saveLS});
 const F=makeFeatures({S,$,render,drawer,closeDrawer,refLink,wireCommon,saveLS,refresh});
