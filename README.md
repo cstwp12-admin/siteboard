@@ -13,7 +13,9 @@ Open the dashboard in Chrome, Edge or Brave (Brave: enable `brave://flags/#file-
 Notes are written in Markdown in `docs-src/` and built to `docs/` with `python3 tools/build_docs.py`.
 
 ## Version, licence and credits
-- Version v0.10.0. The version is set in `js/config.js` and `tools/build_docs.py`; see `docs-src/changelog.md` for changes.
+- Version v0.10.1. The version is set in `js/config.js` and `tools/build_docs.py`; see `docs-src/changelog.md` for changes.
+
+Focused PDF/Word reports have no fixed photo-count limit. Progressive loading, cancellation and source-specific photo errors protect larger exports. Individual photo sharing offers explicit batches while preserving the complete selection and numbering. Test page: `tests/large-photos.html` (50/100/200 distinct synthetic photos); `tests/app-smoke.html?evidence=1&large=1` additionally exercises 200 photos from the real SDR corpus when available.
 
 Mobile and resilience: larger phone controls, responsive map, full settings/register backup and separate-workspace restore. The installable offline shell caches application assets only. Keep the reports folder backed up separately. See `docs-src/resilience.md`.
 

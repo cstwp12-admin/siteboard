@@ -1,5 +1,6 @@
 import { pdfjsLib, fileIndex } from './scanner.js';
 import { dbGet, dbPut } from './db.js';
+import {checkJob,yieldJob} from './photo-jobs.js';
 // Photos are taken from the image objects embedded in the SDR PDF (original resolution, up to ~1300 px).
 // If an image cannot be matched, the page is rendered and cropped instead (fallback).
 const mem = new Map();
@@ -77,21 +78,22 @@ async function capturePage(pg){
   caps.sort((p,q)=>Math.abs(p.cy-q.cy)>25*CAP_SCALE/2?p.cy-q.cy:p.cx-q.cx);
   return caps;
 }
-async function pull(report,items,mode){
+async function pull(report,items,mode,signal){
+  checkJob(signal);
   const res=new Map(); const doc=await openDoc(report); const q=mode==='full'?0.92:0.85, max=mode==='full'?FULL:THUMB;
   try{
     const pages=new Map(); const all=[];
     const withPh=report.items.filter(it=>it.photo).sort((x,y)=>x.no-y.no);
     const need=new Set(items.filter(i=>i.photo).map(i=>i.photo.page));
     // pages are captured only when needed; if the image count per report does not match the items, the page rect is used instead
-    for(let pn=1;pn<=doc.numPages;pn++){ const pg=await doc.getPage(pn); pages.set(pn,pg); let caps=[]; try{ caps=await capturePage(pg); }catch(e){ console.warn('capture failed',e); } caps.forEach(c=>all.push({...c,pn})); }
+    for(let pn=1;pn<=doc.numPages;pn++){await yieldJob(signal);const pg=await doc.getPage(pn); pages.set(pn,pg); let caps=[]; try{ caps=await capturePage(pg); }catch(e){ console.warn('capture failed',e); }checkJob(signal);for(const c of caps){const image=scaled(c.canvas,max,q);c.canvas.width=c.canvas.height=1;delete c.canvas;all.push({...c,image,pn});} }
     const byOrder=all.length===withPh.length;
     for(const it of items){ if(!it.photo) continue; let cand=null;
       if(byOrder) cand=all[withPh.indexOf(it)];
       else { const ph=it.photo; const H=pages.get(ph.page).view[3]; cand=all.filter(m=>m.pn===ph.page&&m.cx/CAP_SCALE>=ph.x-4&&m.cx/CAP_SCALE<=ph.x+ph.w+4&&H-m.cy/CAP_SCALE>=ph.yb-4&&H-m.cy/CAP_SCALE<=ph.yb+ph.h+4)[0]; }
-      if(cand){ try{ res.set(it.no,{...scaled(cand.canvas,max,q),native:true}); }catch(e){ console.warn('native photo failed',e); } } }
+      if(cand){ res.set(it.no,{...cand.image,native:true}); } }
     for(const it of items){ if(!it.photo||res.has(it.no)) continue; const pg0=pages.get(it.photo.page); if(!pg0) continue;
-      const cv=await renderCrop(pg0,it,mode==='full'?4:2.6); res.set(it.no,{...scaled(cv,max,q),native:false}); }
+      await yieldJob(signal);const cv=await renderCrop(pg0,it,mode==='full'?4:2.6);checkJob(signal);res.set(it.no,{...scaled(cv,max,q),native:false});cv.width=cv.height=1; }
   } finally { try{ await doc.destroy(); }catch(_){} }
   return res;
 }
@@ -111,8 +113,8 @@ export function extractReport(report){
   inflight.set(id,p); return p;
 }
 // Full-resolution photos for one report (used by the report generator and the large view). Not cached.
-export async function getFull(report,items){
-  await acquire(); try{ return await pull(report,items,'full'); } finally { release(); }
+export async function getFull(report,items,{signal}={}){
+  checkJob(signal);await acquire(); try{ return await pull(report,items,'full',signal); } finally { release(); }
 }
 export async function getPhotoLarge(report,item){
   const m=await getFull(report,[item]); const g=m.get(item.no); return g?g.url:null;

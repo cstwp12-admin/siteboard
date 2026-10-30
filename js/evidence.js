@@ -12,6 +12,7 @@ import {addImagePages,textBlock,svgEscape} from './share-layout.js';
 import {renderPdf} from './render-pdf.js';
 import {renderDocx} from './render-docx.js';
 import {sendWhatsApp} from './messages.js';
+import {photoBatches,photoReader,checkJob,yieldJob} from './photo-jobs.js';
 
 export function selectionStatistics(records,raw){
   const s=normalizeScope(raw),clamp=n=>Math.max(A.ALIGN.start,Math.min(A.ALIGN.end,n)),a=clamp(s.chFrom??A.ALIGN.start),b=clamp(s.chTo??A.ALIGN.end),bins=[];
@@ -25,13 +26,13 @@ const save=(file)=>{const a=document.createElement('a');a.href=URL.createObjectU
 
 export function makeEvidence(ctx){
   const {S,$,render,saveLS,resolveRange}=ctx;
-  const E={kind:'statistics',scope:null,title:'Selected works',records:[],photoKeys:new Set(),order:[],output:null,busy:false,job:0};
+  const E={kind:'statistics',scope:null,title:'Selected works',records:[],photoKeys:new Set(),order:[],output:null,busy:false,job:0,batchIndex:0,controller:null};
   const prefs=()=>S.settings.sharePrefs||(S.settings.sharePrefs={});
   function sections(){return prefs()[E.kind+'Sections']||SECTION_OPTIONS[E.kind]?.map(x=>x[0])||[];}
   function fields(){return prefs().captionFields||DEFAULT_FIELDS;}
   function invalidate(){if(E.output?.previewURL)URL.revokeObjectURL(E.output.previewURL);E.output=null;const o=$('#evOutput');if(o)o.innerHTML='';}
   function open({kind='statistics',scope={},title='Selected works'}={}){
-    E.job++;E.busy=false;E.kind=kind;E.scope={...resolveRange(),...scope};E.title=title;E.order=[];E.photoKeys=new Set();E.initialized=false;invalidate();S.tab='share';render();
+    E.controller?.abort();E.job++;E.busy=false;E.batchIndex=0;E.kind=kind;E.scope={...resolveRange(),...scope};E.title=title;E.order=[];E.photoKeys=new Set();E.initialized=false;invalidate();S.tab='share';render();
   }
   function apply(root){
     E.scope=readScope(root,E.scope,'ev');E.title=$('#evTitle').value.trim().slice(0,120)||'Selected works';
@@ -45,12 +46,15 @@ export function makeEvidence(ctx){
   function drawRecords(){
     const n=recordCounts(E.records);$('#evCounts').textContent=`${n.items} unique items · ${n.photos} photographs · ${n.reports} source reports · ${n.activities} sub-activities`;
     $('#evScopeLabel').textContent=scopeSummary(E.scope);
+    const picked=ordered().filter(r=>r.item.photo&&E.photoKeys.has(r.key)),batches=photoBatches(picked);E.batchIndex=Math.min(E.batchIndex,Math.max(0,batches.length-1));
+    $('#evBatchControls').innerHTML=E.kind==='photos'?`<label class="fld">Sharing batch<select id="evBatch">${batches.map((b,i)=>`<option value="${i}" ${i===E.batchIndex?'selected':''}>Batch ${i+1} of ${batches.length}: photos ${b.start+1}–${b.end} of ${b.total}</option>`).join('')}</select></label><p class="sub">All ${picked.length} selected photos are retained. Prepare each batch separately; numbering continues across batches. A focused PDF/Word report includes all selected photos in one document.</p>`:`<p class="sub">${picked.length} photos selected. Reports include every selected photo; large documents take longer and use more memory. You can cancel preparation.</p>`;
+    if($('#evBatch'))$('#evBatch').onchange=e=>{E.batchIndex=+e.target.value;invalidate();};
     $('#evRecords').innerHTML=`<div class="scroll" style="max-height:420px"><table class="t"><thead><tr><th>Photo</th><th>Date / source</th><th>Activity</th><th>Location / structure</th><th>Order</th></tr></thead><tbody>${ordered().map((r,i)=>`<tr><td>${r.item.photo?`<label><input type="checkbox" data-ev-photo="${esc(r.key)}" ${E.photoKeys.has(r.key)?'checked':''}> Include</label>`:'No photo'}</td><td>${esc(A.fmtDate(r.date))}<br>${esc(r.report.ref)} #${r.item.no}</td><td>${esc(r.acts.join(' + '))}<br>${esc(r.item.status||'')}</td><td>${esc([r.item.location,r.item.structure].filter(Boolean).join(' · '))}${r.links.map(l=>`<br><span class="sub">${esc(l.id)}: ${esc(l.how)}${l.amb?' (ambiguous)':''}</span>`).join('')}</td><td><button class="btn sm" data-ev-move="${i}" data-dir="-1" aria-label="Move record up">↑</button><button class="btn sm" data-ev-move="${i}" data-dir="1" aria-label="Move record down">↓</button></td></tr>`).join('')||'<tr><td colspan="5">No records match. Change the filters.</td></tr>'}</tbody></table></div>`;
-    $('#evRecords').querySelectorAll('[data-ev-photo]').forEach(c=>c.onchange=()=>{c.checked?E.photoKeys.add(c.dataset.evPhoto):E.photoKeys.delete(c.dataset.evPhoto);invalidate();});
+    $('#evRecords').querySelectorAll('[data-ev-photo]').forEach(c=>c.onchange=()=>{c.checked?E.photoKeys.add(c.dataset.evPhoto):E.photoKeys.delete(c.dataset.evPhoto);E.batchIndex=0;invalidate();drawRecords();});
     $('#evRecords').querySelectorAll('[data-ev-move]').forEach(b=>b.onclick=()=>{const list=ordered(),i=+b.dataset.evMove,j=i+ +b.dataset.dir;if(j<0||j>=list.length)return;[list[i],list[j]]=[list[j],list[i]];E.order=list.map(r=>r.key);$('#evSort').value='manual';invalidate();drawRecords();});
   }
   function vEvidence(v){
-    E.job++;E.busy=false;E.scope=E.scope||resolveRange();
+    E.controller?.abort();E.job++;E.busy=false;E.scope=E.scope||resolveRange();
     v.innerHTML=`<div class="card"><h2>Share &amp; focused report</h2><p class="sub">Select the evidence once, review the matching records, then prepare statistics, captioned photos or a focused PDF/Word report. Category filters select sub-activities; totals identify unique source items.</p>
     <div class="frm"><label class="fld">Output<select id="evKind">${[['statistics','Statistics / overview'],['photos','Photos with captions'],['report','Focused work report']].map(([k,v])=>`<option value="${k}" ${E.kind===k?'selected':''}>${v}</option>`).join('')}</select></label><label class="fld">Title<input id="evTitle" value="${esc(E.title)}"></label><label class="fld">Quick scope<select id="evPreset"><option value="">Custom</option><option value="Earthworks">Earthworks</option><option value="Drainage &amp; culverts">Drainage &amp; culverts</option><option value="Piling &amp; structures">Structures</option><option value="Other">Other works</option><option value="observations">Observations and remarks</option></select></label></div>
     ${E.scope.keys?`<p class="alert">Working with ${E.scope.keys.length} explicitly selected source items. Other filters narrow this selection. <button class="btn sm" id="evUnlock">Use all source items instead</button></p>`:''}
@@ -59,9 +63,9 @@ export function makeEvidence(ctx){
     <div class="frm" style="margin-top:14px"><label class="fld">Photo order<select id="evSort"><option value="manual">Chronological / manual</option><option value="newest">Newest first</option></select></label>${E.kind==='photos'?`<label class="fld">Photo format<select id="evPhotoFormat">${[['table','SDR-style tabular photo sheets'],['card','Captioned photo cards'],['original','Original photos + numbered captions']].map(([k,v])=>`<option value="${k}" ${prefs().photoFormat===k?'selected':''}>${v}</option>`).join('')}</select></label>`:''}</div>
     ${E.kind!=='photos'?`<fieldset><legend>Sections to include</legend>${SECTION_OPTIONS[E.kind].map(([k,l])=>`<label style="display:inline-block;margin:8px"><input type="checkbox" data-ev-section="${k}" ${sections().includes(k)?'checked':''}> ${l}</label>`).join('')}</fieldset>`:''}
     ${E.kind!=='statistics'?`<details><summary>Caption fields</summary>${CAPTION_FIELDS.map(([k,l])=>`<label style="display:inline-block;margin:8px"><input type="checkbox" data-ev-field="${k}" ${fields().includes(k)?'checked':''}> ${l}</label>`).join('')}</details>`:''}
-    <p class="sub">Photo checkboxes affect the photographic output only. Focused report statistics still use every matching item. Up to 20 photos can be prepared per batch.</p>
+    <p class="sub">Photo checkboxes affect the photographic output only. Focused report statistics still use every matching item. Reports have no fixed photo-count cap. Photo sharing uses numbered batches of up to 20 photos.</p><div id="evBatchControls"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><button class="btn sm" id="evSelectPhotos">Include all matching photos</button><button class="btn sm" id="evClearPhotos">Exclude all photos</button></div><div id="evRecords"></div>
-    <button class="btn pri" id="evBuild" style="margin-top:14px">Prepare preview</button> <span class="sub" role="status" id="evMessage"></span><div id="evOutput"></div></div>`;
+    <button class="btn pri" id="evBuild" style="margin-top:14px">Prepare preview</button> <button class="btn" id="evCancel" hidden>Cancel preparation</button> <span class="sub" role="status" id="evMessage"></span><div id="evOutput"></div></div>`;
     invalidate();apply(v);
     $('#evKind').onchange=e=>{E.kind=e.target.value;try{apply(v);}catch(_){}render();};
     $('#evApply').onclick=()=>{try{apply(v);$('#evMessage').textContent='Filters applied.';}catch(e){$('#evMessage').textContent=e.message;}};
@@ -75,22 +79,18 @@ export function makeEvidence(ctx){
     $('#evPhotoFormat')&&($('#evPhotoFormat').onchange=e=>{prefs().photoFormat=e.target.value;saveLS();change();});
     $('#evSelectPhotos').onclick=()=>{E.photoKeys=new Set(E.records.filter(r=>r.item.photo).map(r=>r.key));invalidate();drawRecords();};$('#evClearPhotos').onclick=()=>{E.photoKeys.clear();invalidate();drawRecords();};
     $('#evBuild').onclick=()=>prepare(v);
-  }
-  async function fullPhotos(records,onProgress){
-    const images=new Map(),by=new Map();for(const r of records){if(!by.has(r.report.ref))by.set(r.report.ref,[]);by.get(r.report.ref).push(r);}
-    for(const group of by.values()){onProgress('Reading photos from '+group[0].report.ref+'…');const loaded=await getFull(group[0].report,group.map(r=>r.item));for(const r of group){const im=loaded.get(r.item.no);if(!im?.url)throw Error('Photo unavailable: '+r.report.ref+' #'+r.item.no+'. Reconnect the folder, retry, or explicitly exclude this photo.');images.set(r.key,im);}}
-    return images;
+    $('#evCancel').onclick=()=>{E.controller?.abort();$('#evMessage').textContent='Cancelling after the current processing step…';};
   }
   async function prepare(v){
-    if(E.busy)return;E.busy=true;const job=++E.job,button=$('#evBuild'),msg=$('#evMessage');button.disabled=true;const say=t=>msg.textContent=t;
+    if(E.busy)return;E.busy=true;const job=++E.job,button=$('#evBuild'),msg=$('#evMessage'),controller=E.controller=new AbortController(),signal=controller.signal;button.disabled=true;const say=t=>{if(E.job!==job||S.tab!=='share')controller.abort();checkJob(signal);msg.textContent=t;};
     try{
-      apply(v);if(!E.records.length)throw Error('No records match this scope.');const records=ordered(),counts=recordCounts(records),picked=records.filter(r=>r.item.photo&&E.photoKeys.has(r.key)),section=sections(),fmt=$('#evPhotoFormat')?.value||'table';
-      if((E.kind==='photos'||E.kind==='report'&&section.includes('photos'))&&picked.length>20)throw Error('Select 20 photos or fewer for this batch. No photos have been silently removed.');
+      apply(v);if(!E.records.length)throw Error('No records match this scope.');const records=ordered(),counts=recordCounts(records),allPicked=records.filter(r=>r.item.photo&&E.photoKeys.has(r.key)),batches=photoBatches(allPicked),batch=E.kind==='photos'?batches[E.batchIndex]:null,picked=batch?.records||allPicked,section=sections(),fmt=$('#evPhotoFormat')?.value||'table';
       if(E.kind==='photos'&&!picked.length)throw Error('Include at least one photo to share.');
       if(E.kind!=='photos'&&!section.length)throw Error('Choose at least one output section.');
       v.querySelectorAll('input,select,textarea,button').forEach(el=>el.disabled=true);
+      $('#evCancel').hidden=false;$('#evCancel').disabled=false;await yieldJob(signal);
       const name=E.title.replace(/[\\/:*?"<>|]/g,'').trim()+' '+(E.scope.from||records.map(r=>r.date).sort()[0])+' to '+(E.scope.to||records.map(r=>r.date).sort().at(-1));
-      let text=[E.title,scopeSummary(E.scope),`${counts.items} unique items · ${counts.photos} available photos · ${counts.reports} source reports`, 'Categories may overlap for compound activities.'].join('\n');const output={name,images:[],files:[],text,model:null,pdf:null,captionFields:fields().slice()};
+      let text=[E.title,scopeSummary(E.scope),`${counts.items} unique items · ${counts.photos} available photos · ${counts.reports} source reports`, 'Categories may overlap for compound activities.'].join('\n');const output={name:batch?`${name} batch ${E.batchIndex+1} of ${batches.length}`:name,images:[],files:[],text,model:null,pdf:null,captionFields:fields().slice(),batch:batch?{index:E.batchIndex,count:batches.length,start:batch.start,end:batch.end,total:batch.total}:null};
       if(E.kind==='statistics'){
         const d=selectionStatistics(records,E.scope),svg=mapStatisticsSvg(d,{project:{...PROJECT,...S.settings.project},from:E.scope.from||records.map(r=>r.date).sort()[0],to:E.scope.to||records.map(r=>r.date).sort().at(-1),start:d.start,end:d.end,sections:section,selection:E.title+' · '+scopeSummary(E.scope),heading:'Selected works overview'});
         if(section.some(k=>k!=='daily')){const img=await rasterize(svg,2);output.images.push({img,blob:await (await fetch(img.url)).blob()});}
@@ -100,30 +100,39 @@ export function makeEvidence(ctx){
         if(section.includes('coverage'))output.text+=`\nChainage coverage: ${(d.cov.covered/1000).toFixed(2)} of ${(d.cov.total/1000).toFixed(2)} km (100 m bins).`;
         output.text+='\nRain days in selected source reports: '+d.rain+'. Recorded weather does not establish delay.';
       }else if(E.kind==='photos'){
-        const images=await fullPhotos(picked,say);output.text=picked.map((r,i)=>photoCaption(r,i,fields())).join('\n\n');
-        for(let i=0;i<picked.length;i++){const r=picked[i],im=images.get(r.key);if(fmt==='original'){const blob=await(await fetch(im.url)).blob();output.files.push({name:`${r.report.ref}_photo${r.item.no}.jpg`,blob});output.images.push({img:{url:im.url,w:im.w,h:im.h},blob,original:true});}else output.images.push(...await photoSheet(r,im,i,{fields:fields(),table:fmt==='table'}));}
+        const read=photoReader(picked,getFull,{signal,onProgress:say});output.text=`Batch ${E.batchIndex+1} of ${batches.length} · photos ${batch.start+1}–${batch.end} of ${batch.total}\n\n`+picked.map((r,i)=>photoCaption(r,batch.start+i,fields())).join('\n\n');
+        try{for(let i=0;i<picked.length;i++){say(`Preparing photo ${batch.start+i+1} of ${allPicked.length}…`);await yieldJob(signal);const r=picked[i],im=(await read(r.report,[r.item])).get(r.item.no);if(fmt==='original'){const blob=await(await fetch(im.url)).blob();output.files.push({name:`Photo ${String(batch.start+i+1).padStart(4,'0')} ${r.report.ref.replace(/[\\/:*?"<>|]/g,'-')}_photo${r.item.no}.jpg`,blob});output.images.push({img:{url:im.url,w:im.w,h:im.h},blob,original:true});}else output.images.push(...await photoSheet(r,im,batch.start+i,{fields:fields(),table:fmt==='table'}));}}finally{read.clear();}
         if(fmt==='original')output.originalRecords=picked;
       }else{
         const activePhotos=section.includes('photos')?picked:[];
-        const images=activePhotos.length?await fullPhotos(activePhotos,say):new Map();
         output.model=focusedModel(records,E.scope,S.settings,{title:E.title,sections:section,photoKeys:activePhotos.map(r=>r.key),fields:fields()});
-        const provider=async(report,items)=>new Map(items.map(it=>[it.no,images.get(report.ref+'#'+it.no)]));
-        output.photoProvider=provider;output.pdf=await renderPdf(output.model,{getFull:provider,onProgress:say});output.files=[{name:output.pdf.name,blob:output.pdf.blob}];
+        output.photoProvider=getFull;output.pdf=await renderPdf(output.model,{getFull,onProgress:say,signal,strictPhotos:true});output.files=[{name:output.pdf.name,blob:output.pdf.blob}];
       }
-      if(!output.files.length)output.files=output.images.map((p,i)=>({name:`${name} page ${i+1}.png`,blob:p.blob}));
-      if(E.job!==job)return;E.output=output;drawOutput();say('Preview ready. Review the scope, records and captions before sharing.');
-    }catch(e){if(E.job===job)say(e.message||String(e));}finally{if(E.job===job){E.busy=false;v.querySelectorAll('input,select,textarea,button').forEach(el=>el.disabled=false);button.disabled=false;}}
+      if(!output.files.length)output.files=output.images.map((p,i)=>({name:`${output.name} page ${i+1}.png`,blob:p.blob}));
+      checkJob(signal);if(E.job!==job||S.tab!=='share')return;E.output=output;drawOutput();say('Preview ready. Review the scope, records and captions before sharing.');
+    }catch(e){if(E.job===job)msg.textContent=e.message||String(e);}finally{if(E.job===job){E.busy=false;if(button.isConnected){v.querySelectorAll('input,select,textarea,button').forEach(el=>el.disabled=false);button.disabled=false;$('#evCancel').hidden=true;}}}
   }
   function recordExport(file,destination='(downloaded)',subject=file.name){S.ISS?.record({kind:'Share',type:'Selected evidence',subject,to:destination},file);}
-  async function pdfForOutput(){const out=E.output;if(out.pdf)return out.pdf;let pages=out.images;if(out.originalRecords){pages=[];for(let i=0;i<out.originalRecords.length;i++)pages.push(...await photoSheet(out.originalRecords[i],out.images[i].img,i,{fields:out.captionFields,table:true}));}const {jsPDF}=await loadPdfLibs(),doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});for(let i=0;i<pages.length;i++){if(i)doc.addPage();await addImagePages(doc,pages[i].img,{minWidth:180});}out.pdf={name:out.name+'.pdf',blob:doc.output('blob')};return out.pdf;}
+  async function pdfForOutput({signal,onProgress}={}){const out=E.output;checkJob(signal);if(out.pdf)return out.pdf;const {jsPDF}=await loadPdfLibs(),doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});let page=0;for(let i=0;i<out.images.length;i++){onProgress?.(`Preparing PDF photo/page ${i+1} of ${out.images.length}…`);await yieldJob(signal);const pages=out.originalRecords?await photoSheet(out.originalRecords[i],out.images[i].img,(out.batch?.start||0)+i,{fields:out.captionFields,table:true}):[out.images[i]];for(const p of pages){if(page++)doc.addPage();await addImagePages(doc,p.img,{minWidth:180});}}await yieldJob(signal);if(E.output!==out)throw Error('Selection changed. Prepare a new preview.');out.pdf={name:out.name+'.pdf',blob:doc.output('blob')};return out.pdf;}
+  async function exportJob(out,task){
+    if(E.busy)return;E.busy=true;const job=++E.job,controller=E.controller=new AbortController(),signal=controller.signal,v=$('#view'),cancel=$('#evCancel'),message=$('#evShareStatus');
+    const say=t=>{if(E.job!==job||E.output!==out||S.tab!=='share')controller.abort();checkJob(signal);message.textContent=t;};
+    v.querySelectorAll('input,select,textarea,button').forEach(e=>e.disabled=true);cancel.hidden=false;cancel.disabled=false;
+    try{const file=await task({signal,onProgress:say});say('File ready.');await yieldJob(signal);save(file);recordExport(file);}
+    catch(e){if(E.job===job)message.textContent=e.message||String(e);}
+    finally{if(E.job===job){E.busy=false;if(cancel.isConnected){v.querySelectorAll('input,select,textarea,button').forEach(e=>e.disabled=false);cancel.hidden=true;}}}
+  }
   function drawOutput(){
     const out=E.output,root=$('#evOutput');if(!out||!root)return;root.innerHTML=`<h3>Prepared output</h3><p class="sub">${out.files.length} files prepared. Every caption identifies its source. Original photo sharing keeps numbered captions in this message.</p>${out.images.map((p,i)=>`<p>Page / photo ${i+1}</p><img src="${p.img.url}" alt="Prepared evidence ${i+1}" style="width:100%;max-height:1000px;object-fit:contain;background:#fff;border:1px solid var(--line)">`).join('')}${out.model?`<p>${esc(out.pdf.name)} · ${out.pdf.pages} PDF pages</p><iframe title="Focused report preview" class="pdfv" id="evPDF"></iframe>`:''}<label class="fld">Editable message<textarea id="evCaption" rows="8">${esc(out.text)}</textarea></label><label class="fld">WhatsApp number (optional)<input id="evPhone" value="${esc(S.settings.waTo||'')}"></label><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn" id="evDownload">Download files</button><button class="btn" id="evPDFDownload">Download PDF</button>${out.model?'<button class="btn" id="evWord">Download Word</button>':''}<button class="btn" id="evCopy">Copy captions</button><button class="btn pri" id="evWhatsApp">Share via WhatsApp</button></div><p class="sub" id="evShareStatus" role="status"></p>`;
     if(out.model){out.previewURL=URL.createObjectURL(out.pdf.blob);$('#evPDF').src=out.previewURL;}
-    $('#evDownload').onclick=()=>out.files.forEach((f,i)=>setTimeout(()=>{save(f);recordExport(f);},i*350));
-    $('#evPDFDownload').onclick=async()=>{try{const f=await pdfForOutput();save(f);recordExport(f);}catch(e){$('#evShareStatus').textContent=e.message;}};
-    $('#evWord')&&($('#evWord').onclick=async()=>{try{$('#evWord').disabled=true;const f=await renderDocx(out.model,{getFull:out.photoProvider});save(f);recordExport(f);}catch(e){$('#evShareStatus').textContent=e.message;}finally{$('#evWord').disabled=false;}});
+    const parts=photoBatches(out.files),controls=document.createElement('div');controls.className='frm';controls.innerHTML=`<p class="sub">${out.batch?`Photo batch ${out.batch.index+1} of ${out.batch.count}: photos ${out.batch.start+1}–${out.batch.end} of ${out.batch.total}. `:''}${out.batch&&out.batch.count>1?'Choose another batch above or use the next-batch button. ':''}PDF download includes the entire prepared output.</p>${parts.length>1?`<label class="fld">Attachment part for individual downloads / WhatsApp<select id="evAttachments">${parts.map((p,i)=>`<option value="${i}">Part ${i+1} of ${parts.length}: files ${p.start+1}–${p.end} of ${p.total}</option>`).join('')}</select></label>`:''}${out.batch&&out.batch.index+1<out.batch.count?'<button class="btn" id="evNextBatch">Prepare next photo batch</button>':''}`;root.prepend(controls);
+    const part=()=>parts[+($('#evAttachments')?.value||0)],attachments=()=>part().records;
+    $('#evNextBatch')&&($('#evNextBatch').onclick=()=>{E.batchIndex=out.batch.index+1;$('#evBatch').value=E.batchIndex;prepare($('#view'));});
+    $('#evDownload').onclick=()=>attachments().forEach((f,i)=>setTimeout(()=>{if(E.output===out){save(f);recordExport(f);}},i*350));
+    $('#evPDFDownload').onclick=()=>exportJob(out,options=>pdfForOutput(options));
+    $('#evWord')&&($('#evWord').onclick=()=>exportJob(out,options=>renderDocx(out.model,{getFull:out.photoProvider,...options,strictPhotos:true})));
     $('#evCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('#evCaption').value);$('#evShareStatus').textContent='Captions copied.';}catch(_) {$('#evShareStatus').textContent='Select and copy the caption text manually.';}};
-    $('#evWhatsApp').onclick=async()=>{const b=$('#evWhatsApp');b.disabled=true;try{S.settings.waTo=$('#evPhone').value;saveLS();const res=await sendWhatsApp({text:$('#evCaption').value,files:out.files,phone:S.settings.waTo});$('#evShareStatus').textContent=res.msg+' Delivery is not verified by SiteBoard.';if(res.mode!=='cancelled')for(const f of out.files)recordExport(f,res.mode==='manual'?'(prepared for manual WhatsApp attachment)':'(passed to system share)');}catch(e){$('#evShareStatus').textContent=e.message;}finally{b.disabled=false;}};
+    $('#evWhatsApp').onclick=async()=>{const b=$('#evWhatsApp'),files=attachments(),p=part(),status=$('#evShareStatus'),text=(parts.length>1?`Attachment part ${+($('#evAttachments')?.value||0)+1} of ${parts.length} · files ${p.start+1}–${p.end}\n\n`:'')+$('#evCaption').value;b.disabled=true;try{S.settings.waTo=$('#evPhone').value;saveLS();const res=await sendWhatsApp({text,files,phone:S.settings.waTo});status.textContent=res.msg+' Delivery is not verified by SiteBoard.';if(res.mode!=='cancelled')for(const f of files)recordExport(f,res.mode==='manual'?'(prepared for manual WhatsApp attachment)':'(passed to system share)');}catch(e){status.textContent=e.message;}finally{b.disabled=false;}};
   }
   return {open,vEvidence,state:E,pdfForOutput};
 }

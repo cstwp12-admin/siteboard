@@ -60,7 +60,7 @@ Open *Today* first thing: who has reported, what was done, which structures were
 
 ## 10. Reports, comments and memos
 - **Share & focused report** lets you choose a work category, observation state, structure or chainage range, then prepare filtered statistics, captioned photos or a focused PDF/Word report. Review the matching records before exporting.
-- In **Photos**, select photos and press **Share selected photos…**. Choose numbered captions, photo cards or SDR-style tabular sheets. Up to 20 photos are prepared per batch.
+- In **Photos**, select photos and press **Share selected photos…**. Choose numbered captions, photo cards or SDR-style tabular sheets. Large selections automatically offer numbered batches of up to 20 photos; prepare the next batch without losing the full selection. Use **Focused work report** for a PDF/Word document containing all selected photos, with no fixed count cap. Progress and cancellation are available while preparing files.
 - **Generate report** builds the PDF; download it as PDF or Word, or send it by WhatsApp.
 - In **Report files**, open a report and press **Open PDF** to read the original, or **Comment / send via WhatsApp**.
 - **Messages & memo**: send Monitoring, Observation, Action needed or Follow-up messages, design an internal memo (PDF plus WhatsApp announcement) and see what was sent.

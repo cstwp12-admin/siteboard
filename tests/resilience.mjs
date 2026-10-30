@@ -36,7 +36,7 @@ const cache={async addAll(reqs){for(const r of reqs)cacheStore.set(r.url,{url:r.
 const self={registration:{scope:root},location:{origin:'https://example.test'},clients:{async claim(){}},addEventListener(k,f){listeners[k]=f;},skipWaiting(){self.skipped=true;}};
 vm.runInNewContext(readFileSync(new URL('../sw.js',import.meta.url),'utf8'),{self,URL,Request,Set,caches:{async open(){return cache;},async keys(){return ['unrelated', 'siteboard-shell:'+root+':old'];},async delete(k){deleted.push(k);}},fetch:async()=>{throw Error('offline');}});
 let promise;listeners.install({waitUntil(p){promise=p;}});await promise;
-test('Offline shell contains entry point, all modules and vendor PDF worker',()=>{for(const p of ['index.html','js/backup.js','vendor/pdf.worker.min.mjs','manifest.webmanifest'])assert.ok(cacheStore.has(root+p),p);});
+test('Offline shell contains entry point, all modules and vendor PDF worker',()=>{for(const p of ['index.html','js/backup.js','js/photo-jobs.js','vendor/pdf.worker.min.mjs','manifest.webmanifest'])assert.ok(cacheStore.has(root+p),p);});
 test('Reports, tests and settings are excluded from offline cache',()=>assert.ok(![...cacheStore.keys()].some(x=>/\.pdf$|tests\/|siteboard-settings/.test(x))));
 listeners.activate({waitUntil(p){promise=p;}});await promise;
 test('Activation only removes old caches for this application scope',()=>assert.deepEqual(deleted,['siteboard-shell:'+root+':old']));
