@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>SiteBoard mobile layout checks</title>
+<style>body{font:14px system-ui;margin:12px}iframe{width:390px;height:844px;border:1px solid #ccc}pre{white-space:pre-wrap}</style>
+<h1>Mobile layout checks (390 px)</h1><pre id="out">Starting…</pre><iframe id="app" src="../index.html"></iframe>
+<script type="module">
+const frame=document.querySelector('iframe'),out=document.querySelector('#out'),lines=[];
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+try{
+  for(let n=0;n<200&&!frame.contentWindow.__wp12;n++)await wait(100);
+  const w=frame.contentWindow,api=w.__wp12;if(!api)throw Error('App failed to boot');
+  for(let n=0;n<100&&!api.S.reports.length;n++)await wait(100);
+  if(!api.S.reports.length)throw Error('Run app-smoke.html first to populate the test origin report cache');
+  for(const tab of ['today','overview','subs','gal','map','share','set']){
+    api.S.tab=tab;api.render();await wait(tab==='map'?1800:150);
+    const d=w.document,over=d.documentElement.scrollWidth-w.innerWidth;
+    const bad=[...d.querySelectorAll('.btn')].filter(e=>e.getClientRects().length&&w.getComputedStyle(e).visibility!=='hidden'&&e.getBoundingClientRect().height<43);
+    lines.push(`${over<=1&&!bad.length?'PASS':'FAIL'} ${tab}: page overflow ${over}px, small buttons ${bad.length}`);out.textContent=lines.join('\n');
+  }
+  document.body.dataset.status=lines.some(x=>x.startsWith('FAIL'))?'fail':'pass';
+}catch(e){out.textContent=e.stack;document.body.dataset.status='fail';}
+</script></html>

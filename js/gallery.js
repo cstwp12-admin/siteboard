@@ -5,11 +5,13 @@ import { esc, catColor } from './charts.js';
 import { getPhoto, getPhotoLarge, extractReport, loadInto } from './photos.js';
 import { structuresList, matchStructures, GROUPS } from './structures.js';
 import { fmtCh } from './parser.js';
+import { recordKey, selectRecords } from './scope.js';
 
 export function makeGallery(ctx){
-  const {S,$,drawer,wireCommon,refLink,resolveRange,openReport,saveLS,render}=ctx;
+  const {S,$,drawer,wireCommon,refLink,resolveRange,openReport,saveLS,render,openEvidence}=ctx;
   const G={ from:'', to:'', who:'', cat:'', struct:'', zone:'', ch1:'', ch2:'', q:'', rem:false, shown:60, init:false, list:[] };
   const SB={ grp:'', state:'', zone:'', q:'' };
+  const selected=new Set();
   const chNum=(s)=>{ s=String(s||'').trim(); if(!s) return null; const m=s.match(/^(\d+)\s*[+]\s*(\d+)$/); if(m) return +m[1]*1000+ +m[2]; const n=parseFloat(s); return isNaN(n)?null:(n<1000?n*1000:n); };
   const catOf=(it)=>A.categorize((it.acts&&it.acts[0])||it.activity);
   const opt=(arr,cur,all)=>`<option value="">${all}</option>`+arr.map(x=>{ const [v,l]=Array.isArray(x)?x:[x,x]; return `<option value="${esc(v)}" ${cur===v?'selected':''}>${esc(l)}</option>`; }).join('');
@@ -19,16 +21,8 @@ export function makeGallery(ctx){
     out.sort((a,b)=>b.date.localeCompare(a.date)||a.r.ref.localeCompare(b.r.ref)||a.it.no-b.it.no); return out;
   }
   function filtered(all){
-    const c1=chNum(G.ch1), c2=chNum(G.ch2), q=G.q.toLowerCase().trim();
-    return all.filter(p=>{
-      if(G.from&&p.date<G.from) return false; if(G.to&&p.date>G.to) return false;
-      if(G.who&&p.r.code!==G.who) return false; if(G.cat&&p.cat!==G.cat) return false;
-      if(G.zone&&p.zone!==G.zone) return false;
-      if(G.struct&&!p.codes.includes(G.struct)) return false;
-      if(c1!=null&&(p.it.ch2==null||p.it.ch2<c1)) return false; if(c2!=null&&(p.it.ch1==null||p.it.ch1>c2)) return false;
-      if(G.rem&&!(p.it.remarks||'').trim()) return false;
-      if(q&&!(p.it.activity+' '+p.it.location+' '+p.it.structure+' '+p.it.bq+' '+p.it.remarks+' '+p.r.reporter+' '+p.r.ref).toLowerCase().includes(q)) return false;
-      return true; });
+    const records=selectRecords(S.reports,{from:G.from,to:G.to,reporters:G.who?[G.who]:[],categories:G.cat?[G.cat]:[],zones:G.zone?[G.zone]:[],structures:G.struct?[G.struct]:[],chFrom:G.ch1,chTo:G.ch2,text:G.q,observation:G.rem?'remarks':''},S.settings),keys=new Set(records.map(r=>r.key));
+    return all.filter(p=>keys.has(recordKey(p.r,p.it)));
   }
   const capHtml=(p)=>`<b>${String(p.it.no).padStart(2,'0')} ${esc(p.it.activity)}</b><br>${esc(A.fmtShort(p.date))} · ${esc(p.r.reporter)}${p.it.location?'<br>'+esc(p.it.location):''}`;
 
@@ -55,7 +49,8 @@ export function makeGallery(ctx){
       <label class="fld">Text<input id="gQ" placeholder="activity, location, remark…" value="${esc(G.q)}"></label>
       <label class="fld" style="justify-content:end"><span><input type="checkbox" id="gR" ${G.rem?'checked':''}> With remarks only</span></label></div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap"><span class="sub" id="gCnt" style="margin:0"></span><span style="flex:1"></span>
-      <button class="btn sm" id="gAll">Prepare all thumbnails</button><button class="btn sm" id="gX">Reset filters</button><span class="sub" id="gPg" style="margin:0"></span></div></div>
+      <button class="btn sm" id="gAll">Prepare all thumbnails</button><button class="btn sm" id="gX">Reset filters</button><span class="sub" id="gPg" style="margin:0"></span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn sm" id="gSelectVisible">Select visible</button><button class="btn sm" id="gSelectMatching">Select all matching</button><button class="btn sm" id="gClearSelection">Clear selection</button><button class="btn pri" id="gShareSelection">Share selected photos…</button><button class="btn" id="gScopeReport">Report for this scope…</button><span class="sub" id="gSelectedCount"></span></div></div>
       <div class="ph-grid gal" id="gGrid" style="margin-top:12px"></div><div style="text-align:center;margin:14px"><button class="btn" id="gMore">Show more</button></div>`;
     const bind=(id,k,ev='onchange')=>{ $(id)[ev]=(e)=>{ G[k]=e.target.type==='checkbox'?e.target.checked:e.target.value; G.shown=60; draw(v,all); }; };
     bind('#gF','from'); bind('#gT','to'); bind('#gW','who'); bind('#gC','cat'); bind('#gS','struct'); bind('#gZ','zone'); bind('#gC1','ch1'); bind('#gC2','ch2'); bind('#gR','rem');
@@ -63,14 +58,23 @@ export function makeGallery(ctx){
     $('#gX').onclick=()=>{ Object.assign(G,{from:'',to:'',who:'',cat:'',struct:'',zone:'',ch1:'',ch2:'',q:'',rem:false,shown:60,init:true}); vGallery(v); };
     $('#gMore').onclick=()=>{ G.shown+=60; draw(v,all); };
     $('#gAll').onclick=()=>prefetch(all);
+    $('#gSelectVisible').onclick=()=>{G.list.slice(0,G.shown).forEach(p=>selected.add(recordKey(p.r,p.it)));draw(v,all);};
+    $('#gSelectMatching').onclick=()=>{G.list.forEach(p=>selected.add(recordKey(p.r,p.it)));draw(v,all);};
+    $('#gClearSelection').onclick=()=>{selected.clear();draw(v,all);};
+    $('#gShareSelection').onclick=()=>{if(!selected.size){$('#gSelectedCount').textContent='Select at least one photo.';return;}const live=all.filter(p=>selected.has(recordKey(p.r,p.it)));openEvidence({kind:'photos',scope:{from:'',to:'',keys:live.map(p=>recordKey(p.r,p.it))},title:'Selected site photos'});};
+    $('#gScopeReport').onclick=()=>openEvidence({kind:'report',scope:{from:G.from,to:G.to,reporters:G.who?[G.who]:[],categories:G.cat?[G.cat]:[],zones:G.zone?[G.zone]:[],structures:G.struct?[G.struct]:[],chFrom:G.ch1,chTo:G.ch2,text:G.q,observation:G.rem?'remarks':''},title:'Selected work scope'});
     draw(v,all);
   }
   function draw(v,all){
-    G.list=filtered(all); const g=$('#gGrid'); const n=G.list.length, k=Math.min(n,G.shown);
+    try{G.list=filtered(all);}catch(e){$('#gCnt').textContent=e.message;return;} const g=$('#gGrid'); const n=G.list.length, k=Math.min(n,G.shown);
+    const present=new Set(all.map(p=>recordKey(p.r,p.it)));for(const key of selected)if(!present.has(key))selected.delete(key);
+    const visibleKeys=new Set(G.list.map(p=>recordKey(p.r,p.it)));$('#gSelectedCount').textContent=`${selected.size} selected · ${[...selected].filter(k=>!visibleKeys.has(k)).length} hidden by filters`;
     $('#gCnt').textContent=`${n} photo${n===1?'':'s'} of ${all.length}`;
-    g.innerHTML=G.list.slice(0,k).map((p,i)=>`<div class="ph gp" data-o="${i}" style="cursor:pointer"><img alt="" data-i="${i}"><div class="cap">${capHtml(p)}<br><span class="badge" style="background:${catColor(p.cat)}22;color:var(--ink)">${esc(p.cat)}</span>${p.it.remarks?' <span class="badge warn">remark</span>':''}</div></div>`).join('')||'<p class="sub" style="padding:16px">No photos match these filters.</p>';
+    g.innerHTML=G.list.slice(0,k).map((p,i)=>`<div class="ph gp" data-o="${i}" style="cursor:pointer"><img alt="" data-i="${i}"><div class="cap">${capHtml(p)}<br><span class="badge" style="background:${catColor(p.cat)}22;color:var(--ink)">${esc(p.cat)}</span>${p.it.remarks?' <span class="badge warn">remark</span>':''}<br><label data-gallery-select><input type="checkbox" data-photo-key="${esc(recordKey(p.r,p.it))}" ${selected.has(recordKey(p.r,p.it))?'checked':''}> Select photo</label></div></div>`).join('')||'<p class="sub" style="padding:16px">No photos match these filters.</p>';
     $('#gMore').style.display=k<n?'inline-block':'none';
     g.querySelectorAll('.gp').forEach(d=>d.onclick=()=>lightbox(+d.dataset.o));
+    g.querySelectorAll('[data-gallery-select]').forEach(el=>el.onclick=e=>e.stopPropagation());
+    g.querySelectorAll('[data-photo-key]').forEach(el=>el.onchange=()=>{el.checked?selected.add(el.dataset.photoKey):selected.delete(el.dataset.photoKey);draw(v,all);});
     lazy(g);
   }
   async function prefetch(all){
@@ -98,7 +102,8 @@ export function makeGallery(ctx){
     LB.querySelector('#lbC').innerHTML=`<b style="font-size:15px">${String(it.no).padStart(2,'0')} ${esc(it.activity)}</b> <span style="opacity:.7">· ${i+1} / ${G.list.length}</span><br>
       ${esc(A.fmtDate(p.date,true))}${it.time?' · '+esc(it.time):''} · ${esc(r.reporter)}, ${esc(r.role)} · ${esc(r.ref)}<br>
       ${it.location?'Location: '+esc(it.location)+'<br>':''}${it.ch1!=null?'Chainage: '+esc(fmtCh(it.ch1))+(it.ch2!==it.ch1&&it.ch2!=null?' – '+esc(fmtCh(it.ch2)):'')+'<br>':''}${it.structure?'Structure: '+esc(it.structure)+'<br>':''}${it.bq?'BQ: '+esc(it.bq)+' · ':''}${it.status?'Status: '+esc(it.status):''}${it.remarks?'<br>Remarks: '+esc(it.remarks):''}
-      <br><span class="lnk" id="lbR" style="color:#9cf;cursor:pointer;text-decoration:underline">Open report</span> ${gps?' · '+gps:''} · <a id="lbD" download="${esc(r.ref)}_${it.no}.jpg" style="color:#9cf" href="#">Download photo</a>`;
+      <br><span class="lnk" id="lbR" style="color:#9cf;cursor:pointer;text-decoration:underline">Open report</span> ${gps?' · '+gps:''} · <a id="lbD" download="${esc(r.ref)}_${it.no}.jpg" style="color:#9cf" href="#">Download photo</a> <button class="btn sm" id="lbShare">Share with caption…</button>`;
+    LB.querySelector('#lbShare').onclick=()=>{LB.style.display='none';openEvidence({kind:'photos',scope:{from:'',to:'',keys:[recordKey(r,it)]},title:'Site photo'});};
     LB.querySelector('#lbR').onclick=()=>{ LB.style.display='none'; openReport(r.ref); };
     const u=await getPhoto(r,it).catch(()=>null); if(my!==seq) return; if(u){ img.src=u; LB.querySelector('#lbD').href=u; }
     const big=await getPhotoLarge(r,it).catch(()=>null); if(my!==seq) return; if(big){ img.src=big; LB.querySelector('#lbD').href=big; }
@@ -138,11 +143,15 @@ export function makeGallery(ctx){
   }
   function structDrawer(r){
     const recs=r.e.recs; const withPh=recs.filter(x=>x.item.photo);
-    drawer(`<h3>${esc(r.s.id)} · ${esc(r.s.name)}</h3><p class="sub">${esc(r.s.grp)} · drawing ${esc(fmtCh(r.s.chDrawing))}${r.s.moved?' · actual '+esc(fmtCh(r.s.ch)):''} · ${esc(r.s.zone)} · ${recs.length} record(s), ${withPh.length} with photos</p>
+    drawer(`<h3>${esc(r.s.id)} · ${esc(r.s.name)}</h3><p class="sub">${esc(r.s.grp)} · drawing ${esc(fmtCh(r.s.chDrawing))}${r.s.moved?' · actual '+esc(fmtCh(r.s.ch)):''} · ${esc(r.s.zone)} · ${recs.length} record(s), ${withPh.length} with photos</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><button class="btn" id="sShareProgress">Share progress…</button><button class="btn" id="sFocusedReport">Generate focused report…</button><button class="btn" id="sLocationShare">Works at this location…</button></div>
       <div class="frm" style="grid-template-columns:1fr 2fr auto;align-items:end;margin-bottom:10px"><label class="fld">Actual chainage on site (e.g. 71+720)<input id="oC" value="${r.s.moved?esc(fmtCh(r.s.ch)):''}" placeholder="${esc(fmtCh(r.s.chDrawing))}"></label><label class="fld">Note<input id="oN" value="${esc(r.s.note)}" placeholder="e.g. relocated 45 m to suit stream"></label><span><button class="btn sm pri" id="oS">Save</button> <button class="btn sm" id="oR">Reset</button></span></div>
       <table class="t"><thead><tr><th>Date</th><th>Activity</th><th>Location</th><th>Status</th><th>Report</th></tr></thead><tbody>${recs.slice(0,40).map(x=>`<tr><td>${esc(A.fmtShort(x.date))}</td><td>${esc(x.item.activity)}${mark(x)}</td><td>${esc(x.item.location||'')}</td><td>${esc(x.item.status||'')}</td><td>${refLink(x.report)}</td></tr>`).join('')||'<tr><td colspan="5" class="sub">No records in the connected folder.</td></tr>'}</tbody></table>
       ${withPh.length?`<h3 style="margin-top:14px">Photos</h3><div class="ph-grid">${withPh.slice(0,24).map((x,i)=>`<div class="ph gp" data-k="${i}" style="cursor:pointer"><img alt="" data-k="${i}"><div class="cap">${esc(A.fmtShort(x.date))} · ${esc(x.item.activity)}</div></div>`).join('')}</div>`:''}`);
     wireCommon($('#drawer'));
+    const launch=(kind,scope)=>{document.getElementById('dx')?.click();openEvidence({kind,scope,title:r.s.id+' · '+r.s.name});};
+    $('#sShareProgress').onclick=()=>launch('statistics',{structures:[r.s.id]});
+    $('#sFocusedReport').onclick=()=>launch('report',{structures:[r.s.id]});
+    $('#sLocationShare').onclick=()=>launch('report',{chFrom:r.s.ch-50,chTo:r.s.ch+50});
     const lst=withPh.slice(0,24).map(x=>({r:x.report,it:x.item,date:x.date,cat:catOf(x.item),codes:[]}));
     $('#drawer').querySelectorAll('.gp').forEach(d=>d.onclick=()=>lightbox(+d.dataset.k,lst));
     $('#drawer').querySelectorAll('img[data-k]').forEach(im=>{ const p=lst[+im.dataset.k]; loadInto(im,p.r,p.it); });

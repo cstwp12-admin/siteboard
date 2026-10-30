@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Backup UI checks</title><h1>Backup UI checks</h1><div id="host"></div><pre id="out"></pre>
+<script type="module">
+import {createBackup,mountBackup} from '../js/backup.js';
+const original=new Map(Object.keys(localStorage).filter(k=>k.startsWith('wp12dash.')).map(k=>[k,localStorage.getItem(k)]));
+const results=[],out=document.querySelector('#out');let downloads=0;
+const anchorClick=HTMLAnchorElement.prototype.click;
+HTMLAnchorElement.prototype.click=function(){if(this.download){downloads++;return;}anchorClick.call(this);};
+const check=(ok,label)=>{if(!ok)throw Error(label);results.push('PASS '+label);out.textContent=results.join('\n');};
+try{
+  const existing=createBackup();check(existing.workspaces.length>0,'Back up actual application defaults/settings');
+  mountBackup(document.querySelector('#host'));document.querySelector('[data-export]').click();check(downloads===1,'Export prepares a backup download');
+  const data={format:'SiteBoard-settings-backup',schema:1,workspaces:[{name:'UI fixture',settings:{issued:[{id:'fixture',text:'Complete memo'}],memoSeq:{'SB/2026/':45}}}]};
+  const input=document.querySelector('[data-file]'),dt=new DataTransfer();dt.items.add(new File([JSON.stringify(data)],'fixture.json',{type:'application/json'}));input.files=dt.files;input.dispatchEvent(new Event('change'));
+  for(let i=0;i<50&&!document.querySelector('[data-preview] button');i++)await new Promise(r=>setTimeout(r,20));
+  check(document.querySelector('[data-preview]').textContent.includes('1 register entries'),'Preview shows workspace and register count');
+  document.querySelector('[data-preview] button').click();check(document.querySelector('[data-message]').textContent.startsWith('Restored 1'),'Restore UI completes successfully');
+  check(downloads===2,'Recovery backup is prepared before restoring');
+  const restored=createBackup();check(restored.workspaces.length===existing.workspaces.length+1,'Restore adds a workspace');
+  check(restored.workspaces.at(-1).settings.memoSeq['SB/2026/']===45,'Restore preserves memo counter');
+  check(JSON.stringify(restored.workspaces.slice(0,-1))===JSON.stringify(existing.workspaces),'Existing settings remain identical');
+  document.body.dataset.status='pass';
+}catch(e){out.textContent+='\nFAIL '+e.stack;document.body.dataset.status='fail';}
+finally{HTMLAnchorElement.prototype.click=anchorClick;for(const k of Object.keys(localStorage))if(k.startsWith('wp12dash.')&&!original.has(k))localStorage.removeItem(k);for(const [k,v]of original)localStorage.setItem(k,v);}
+</script></html>

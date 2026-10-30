@@ -28,6 +28,13 @@ def main():
     if any(p.exists() for p in (folder, archive, manifest)):
         raise RuntimeError('Release already exists; choose a new version or review the existing files')
     source_files = sorted(p for p in app.rglob('*') if p.is_file() and '__pycache__' not in p.parts)
+    shell = (app / 'sw.js').read_text(encoding='utf-8')
+    if f'const VERSION="{version}-' not in shell:
+        raise RuntimeError('Rebuild offline shell before packaging')
+    assets = json.loads(re.search(r'ASSETS=(\[.*?\]);', shell).group(1))
+    fingerprint = hashlib.sha256(b''.join((app / p).read_bytes() for p in assets)).hexdigest()[:16]
+    if f'{version}-{fingerprint}' not in shell:
+        raise RuntimeError('Offline shell is stale; run tools/build_shell.py')
     entries = []
     for source in source_files:
         relative = source.relative_to(app)

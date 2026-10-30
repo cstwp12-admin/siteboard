@@ -23,6 +23,18 @@ A **logo** can be added to the cover in Settings. The report is generated on you
 - PDF exports preserve the image proportions and split tall images across pages when necessary. The accompanying description is included in full on separate PDF pages.
 - On a computer WhatsApp cannot receive the image from a web page: SiteBoard downloads it and opens WhatsApp, and you attach it with the paperclip (or paste it if you used *Copy image*).
 
+## Selected evidence and focused reports
+
+Open **Share & focused report**, or start from **Photos**, a structure drawer, or **Map**. Choose **Statistics / overview**, **Photos with captions**, or **Focused work report**. Set dates, team, personnel, categories, zones, structure(s), chainage interval, side, observations or text. Multiple choices in one filter mean any of those values; different filters apply together.
+
+Press **Apply filters** and check the source records and unique-item count. Structure filters use the same code, manual assignment and chainage matching as the structure board; ambiguous matches remain labelled. Chainage filters match overlapping intervals. Text matches are shown explicitly for review.
+
+For statistics, choose key figures, categories, chainage coverage, reporter names, structures, data checks and a daily chart. Compound activities may appear in multiple categories; unique-item totals remain separate. Weather is context from selected source reports, not a determination of disruption or delay. Personnel compliance remains in the matrix/overview share view, where dates and personnel can be selected independently from work activities.
+
+For a focused report, use a quick category preset (for example Earthworks) or select custom filters. Observation options distinguish the SDR Observation status, any remarks, and Open/Monitoring/Closed follow-up states. Choose the report sections and photographic record. PDF and Word use the same selected dataset; excluding photographs does not change the work-item statistics. Earlier/latest photos can be selected and ordered for comparison.
+
+Press **Prepare preview** before downloading or sharing. Changing parameters clears the old output. Up to 20 photos are prepared per batch; SiteBoard asks you to narrow a larger batch rather than removing photos silently. If a source photo cannot be read, reconnect the folder and retry, or explicitly exclude that photo. Sharing hands files to the system share sheet where supported; desktop browsers download files and copy captions for manual WhatsApp attachment. SiteBoard cannot verify delivery or automatically assign separate captions inside WhatsApp.
+
 ## Opening, commenting and sending
 - In *Report files*, click a report reference, then **Open PDF** to read the original SDR PDF in a browser tab straight from your folder.
 - **Comment / send via WhatsApp** (same panel), the **Comment…** button on each item and **Send…** in *Observations* open the message composer with the details filled in.

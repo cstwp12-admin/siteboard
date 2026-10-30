@@ -99,6 +99,25 @@ iframe.pdfv{width:100%;height:78vh;border:1px solid var(--line);border-radius:8p
 
 #paperWrap{margin-top:14px;display:none}
 
+/* Shared evidence workbench */
+.scope-controls{padding:12px 0}.scope-controls .fld{min-width:0}.scope-controls select[multiple]{min-height:100px;max-width:100%;width:100%}.scope-controls small{font-size:10.5px;line-height:1.4}
+#view fieldset{border:1px solid var(--line);border-radius:8px;margin:12px 0;padding:8px}#view legend{font-size:13px;color:var(--muted)}
+#view summary{cursor:pointer;padding:8px 0;font-weight:600}#evCounts,#evScopeLabel{overflow-wrap:anywhere}#evOutput{border-top:1px solid var(--line);margin-top:16px;padding-top:12px}#evOutput textarea{width:100%;min-height:160px}
+@media(max-width:600px){.scope-controls,.scope-controls.frm{grid-template-columns:1fr}#evRecords .btn{min-height:34px}.scope-controls select[multiple]{font-size:14px}#evOutput .btn{min-height:40px}}
+
 table.mx td.ex{color:var(--muted)}
+.app-status{padding:6px 12px;background:var(--panel2);font-size:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}.app-status[hidden]{display:none}
+@media(max-width:600px){
+  .btn,.btn.sm,#tabs button,.wschip{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+  #tabs button,.wschip{justify-content:flex-start}.side{overflow-y:auto;padding-bottom:env(safe-area-inset-bottom)}
+  .top-in{gap:6px}.top-in .ttl{flex:1;min-width:0}.top-in .ttl h1{font-size:18px}.top-in .sp{display:none}#gs{order:5;flex-basis:100%;width:100%}
+  .frm{grid-template-columns:minmax(0,1fr)}.fld{min-width:0}.fld input,.fld select,.fld textarea,.filters input,.filters select{max-width:100%;min-height:44px;font-size:16px}
+  .card{padding:12px;overflow-wrap:anywhere}.card:has(>table){overflow-x:auto}.grid{min-width:0}.ph-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #mpMap{height:58svh!important;min-height:300px;max-height:600px}.drawer{max-height:100dvh;overflow:auto;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+  .scroll{overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}.filters{gap:8px}.filters label{max-width:100%}
+  #evRecords .btn,#evOutput .btn{min-height:44px}main{padding-bottom:calc(40px + env(safe-area-inset-bottom))}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+@media print{.app-status{display:none!important}}
 
 .wschip{display:block;width:calc(100% - 24px);margin:0 12px 8px;text-align:left;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:7px 10px;cursor:pointer;font:600 13px/1.3 inherit}.wschip span{display:block;font-weight:400;font-size:11.5px;color:#C9D3DA}.wschip:hover{background:rgba(255,255,255,.12)}

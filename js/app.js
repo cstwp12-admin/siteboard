@@ -16,6 +16,9 @@ import { importSetup, structuresList, DEFAULT_ACTMAP } from './structures.js';
 import { setProjectConfig, getProjectConfig, hasImportedGeometry, geometrySignature, chainageLabel } from './project.js';
 import { periodFor, defaultNo } from './report.js';
 import { buildModel, fileBase } from './model.js';
+import { makeEvidence } from './evidence.js';
+import { mountBackup } from './backup.js';
+import { startPwa } from './pwa.js';
 import { renderPdf } from './render-pdf.js';
 import { renderDocx } from './render-docx.js';
 
@@ -138,8 +141,9 @@ function renderFilters(){
 
 // ------------------------------------------------------------------ views
 const IC={reg:'<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/>',map:'<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',today:'<path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/><circle cx="12" cy="12" r="4"/>',overview:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',subs:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',acts:'<path d="M4 6h16M4 12h16M4 18h10"/>',chain:'<path d="M3 17l5-5 4 3 8-9"/><path d="M3 21h18"/>',struct:'<path d="M3 20h18M5 20V9l7-5 7 5v11M9 20v-6h6v6"/>',gal:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 9"/>',rfi:'<path d="M7 18a4 4 0 010-8 5 5 0 019.6-1A4 4 0 0117 18z"/>',obs:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L2.4 18a2 2 0 001.7 3h15.8a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/>',msg:'<path d="M21 12a8 8 0 01-11.6 7.1L3 21l1.9-5.8A8 8 0 1121 12z"/><path d="M8.5 11h7M8.5 14h4"/>',gen:'<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M9 14h6M9 17h4"/>',reports:'<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',guide:'<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1-1.5 2M12 17h.01"/>',set:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>'};
-const NAV=[['Monitor',[['today','Today'],['overview','Overview'],['subs','Submissions']]],['Site',[['acts','Activities'],['chain','Chainage & zones'],['struct','Structures'],['gal','Photos'],['map','Map'],['rfi','RFI & weather'],['obs','Observations']]],['Reports',[['gen','Generate report'],['msg','Messages & memo'],['reg','Issued register'],['reports','Report files']]],['Help',[['guide','Guide'],['set','Settings']]]];
+const NAV=[['Monitor',[['today','Today'],['overview','Overview'],['subs','Submissions']]],['Site',[['acts','Activities'],['chain','Chainage & zones'],['struct','Structures'],['gal','Photos'],['map','Map'],['rfi','RFI & weather'],['obs','Observations']]],['Reports',[['share','Share & focused report'],['gen','Generate report'],['msg','Messages & memo'],['reg','Issued register'],['reports','Report files']]],['Help',[['guide','Guide'],['set','Settings']]]];
 const ADMIN_TABS=['gen','msg','reg','reports'];
+IC.share=IC.gen;
 const TABS=NAV.flatMap(g=>g[1]);
 const navFor=()=>isAdmin()?NAV:NAV.map(([g,items])=>[g,items.filter(i=>!ADMIN_TABS.includes(i[0]))]).filter(([g,items])=>items.length);
 function render(){
@@ -153,10 +157,10 @@ function render(){
   $('#ptitle').textContent=(TABS.find(t=>t[0]===S.tab)||[])[1]||'';
   { const ds=S.reports.map(r=>r.date).sort(); $('#pmeta').textContent=ds.length?`${S.reports.length} reports · ${A.fmtShort(ds[0])} – ${A.fmtDate(ds.at(-1))}${S.status.at?' · updated '+new Date(S.status.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):''}`:'No reports loaded'; }
   renderTop(); renderFilters();
-  $('#filters').style.display = ['set','gen','msg','reports','guide','obs','gal','struct','today'].includes(S.tab)?'none':'flex';
+  $('#filters').style.display = ['set','gen','share','msg','reports','guide','obs','gal','struct','today'].includes(S.tab)?'none':'flex';
   const v=$('#view'); if(S.tab==='gen') drawPreview(); else { $('#paperWrap').style.display='none'; }
   if(!S.reports.length && S.tab!=='set'){ v.innerHTML=emptyView(); wireDrop(); return; }
-  ({overview:vOverview,subs:vSubs,acts:vActs,chain:vChain,rfi:vRfi,reports:vReports,gen:vGen,msg:MS.vMessages,reg:ISS.vRegister,set:vSet,obs:F.vObs,guide:F.vGuide,gal:GL.vGallery,map:MP.vMap,struct:GL.vStructures,today:TD.vToday}[S.tab])(v);
+  ({share:EV.vEvidence,overview:vOverview,subs:vSubs,acts:vActs,chain:vChain,rfi:vRfi,reports:vReports,gen:vGen,msg:MS.vMessages,reg:ISS.vRegister,set:vSet,obs:F.vObs,guide:F.vGuide,gal:GL.vGallery,map:MP.vMap,struct:GL.vStructures,today:TD.vToday}[S.tab])(v);
   wireCommon(v);
 }
 function emptyView(){
@@ -208,7 +212,7 @@ function vOverview(v){
    <div class="card"><h2>Latest files received</h2><div class="sub">By file date</div><table class="t"><thead><tr><th>Report</th><th>Reporter</th><th class="num">Items</th></tr></thead><tbody>${recent.map(r=>`<tr><td>${refLink(r)}<br><span class="badge">${A.fmtShort(r.date)}</span></td><td>${esc(r.reporter)} <span class="badge">${esc(r.role)}</span></td><td class="num">${r.items.length}</td></tr>`).join('')}</tbody></table></div>
    <div class="card" style="grid-column:1/-1"><h2>Where works were photographed</h2><div class="sub">CH 62+700 – 77+508 · dominant category per 100 m</div>${strip(bins,{w:1100})}</div>
   </div>`;
-  $('#bShareOv').onclick=()=>SN.open('overview');
+   $('#bShareOv').onclick=()=>SN.open('overview');
 }
 
 function vSubs(v){
@@ -421,6 +425,7 @@ function vSet(v){
    <h2 style="margin-top:16px">Reporting rules</h2><div class="sub">Roles that must report every working day (others report as required).</div><div style="display:flex;gap:14px;flex-wrap:wrap">${roles.map(r=>`<label><input type="checkbox" data-role="${esc(r)}" ${(S.settings.expectedRoles||DEFAULTS.expectedRoles).includes(r)?'checked':''}> ${esc(r)}</label>`).join('')}</div>
    <h2 style="margin-top:16px">Share with team</h2><div class="sub">Project details, reporting rules, non-working days and observation follow-up are saved in <code>siteboard-settings.json</code> in the report folder.</div><button class="btn" id="svShared">Save settings to folder</button> <span id="svMsg" class="sub"></span>
    <p class="sub" style="margin-top:12px">Non-working days you marked: ${S.settings.daysOff.length+S.settings.daysOn.length} <button class="btn sm" id="clrd">Reset</button></p></div></div>`;
+  const backupHost=document.createElement('div');backupHost.className='card';v.append(backupHost);mountBackup(backupHost);
   v.querySelectorAll('[data-p]').forEach(i=>i.oninput=()=>{ S.settings.project[i.dataset.p]=i.value; saveLS(); });
   v.querySelectorAll('[data-e]').forEach(i=>i.onchange=()=>{ S.settings.expected[i.dataset.e]=i.checked; saveLS(); });
   v.querySelectorAll('[data-role]').forEach(i=>i.onchange=()=>{ const cur=new Set(S.settings.expectedRoles||DEFAULTS.expectedRoles); i.checked?cur.add(i.dataset.role):cur.delete(i.dataset.role); S.settings.expectedRoles=[...cur]; saveLS(); render(); });
@@ -476,18 +481,20 @@ document.addEventListener('mousemove',(e)=>{ const t=e.target.closest&&e.target.
   tip.style.left=Math.min(innerWidth-w-8,e.clientX+14)+'px'; tip.style.top=Math.min(innerHeight-h-8,e.clientY+14)+'px'; });
 $('#dbg').onclick=closeDrawer;
 window.addEventListener('beforeprint',()=>closeDrawer());
-const GL=makeGallery({S,$,drawer,wireCommon,refLink,resolveRange,openReport,saveLS,render});
+const openEvidence=(options)=>EV.open(options);
+const GL=makeGallery({S,$,drawer,wireCommon,refLink,resolveRange,openReport,saveLS,render,openEvidence});
 const TD=makeToday({S,$,GL});
 const ISS=makeIssued({S,$,drawer,saveLS,render}); S.ISS=ISS;
 const MS=makeMessages({S,$,drawer,closeDrawer,saveLS,refLink,wireCommon,openReport,ISS}); S.MS=MS;
-const MP=makeMap({S,$,drawer,resolveRange,inRange,MS,openReport,saveLS,render});
-const SN=makeSnapshot({S,$,drawer,resolveRange,inRange,MS,saveLS});
+const MP=makeMap({S,$,drawer,resolveRange,inRange,MS,openReport,saveLS,render,openEvidence});
+const SN=makeSnapshot({S,$,drawer,resolveRange,inRange,MS,saveLS,openEvidence});
+const EV=makeEvidence({S,$,render,saveLS,resolveRange});
 MP.setSnapshot(SN); SN.setMapProvider(MP);
 const F=makeFeatures({S,$,render,drawer,closeDrawer,refLink,wireCommon,saveLS,refresh});
 $('#gs').oninput=(e)=>{ clearTimeout(F._t); F._t=setTimeout(()=>F.openSearch(e.target.value),250); };
-window.__wp12={S,render,fromFiles,F,MP,SN,applyTeam,refresh,applyProjectSettings};
+window.__wp12={S,render,fromFiles,F,MP,SN,EV,applyTeam,refresh,applyProjectSettings};
 applyProjectSettings(false);
 $('#menu').onclick=()=>document.body.classList.toggle('nav-open'); $('#navbg').onclick=()=>document.body.classList.remove('nav-open');
 $('#thm').onclick=()=>{ const dark=document.documentElement.dataset.theme?document.documentElement.dataset.theme==='dark':matchMedia('(prefers-color-scheme:dark)').matches; S.settings.theme=dark?'light':'dark'; applyTheme(); saveLS(); };
 $('#verTag').textContent=`v${VERSION}`;
-applyTheme(); boot();
+applyTheme(); boot(); startPwa();

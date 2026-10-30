@@ -13,6 +13,10 @@ Open the dashboard in Chrome, Edge or Brave (Brave: enable `brave://flags/#file-
 Notes are written in Markdown in `docs-src/` and built to `docs/` with `python3 tools/build_docs.py`.
 
 ## Version, licence and credits
-- Version v0.8.2. The version is set in `js/config.js` and `tools/build_docs.py`; see `docs-src/changelog.md` for changes.
+- Version v0.10.0. The version is set in `js/config.js` and `tools/build_docs.py`; see `docs-src/changelog.md` for changes.
+
+Mobile and resilience: larger phone controls, responsive map, full settings/register backup and separate-workspace restore. The installable offline shell caches application assets only. Keep the reports folder backed up separately. See `docs-src/resilience.md`.
+
+Before packaging: run `python tools/build_docs.py`, then `python tools/build_shell.py`, `node tests/resilience.mjs` and the browser regression pages. Upload the complete package, including `sw.js`, `manifest.webmanifest` and `icons/`. Keep the same site address to retain browser workspaces.
 - Licence: MIT, see `LICENSE`. Third-party components: `THIRD_PARTY_NOTICES.md`.
 - Copyright © 2026 WPN.

@@ -3,6 +3,11 @@ title: Structures and photos
 nav_order: 3
 ---
 # Structures and photos
+## Sharing selected evidence
+
+In **Photos**, use the checkboxes or **Select visible** / **Select all matching**. The selection count shows photos hidden by filters; selections remain until cleared. **Share selected photos…** opens the selection in the workbench. Choose original photos with numbered text captions, captioned cards, or SDR-style field/value photo sheets. Caption fields and order can be changed, and long tables continue on labelled pages. PDF output includes captions even when the image-sharing format is Original photos.
+
+**Report for this scope…** creates a focused report from the current gallery filters, including matching items without photos. In a structure drawer, **Share progress…** and **Generate focused report…** use the structure board's matching rules. **Works at this location…** starts with a 100 m interval centred on the structure's active chainage; adjust the interval and side before generating. Reported status and percentages are retained as source statements, not inferred from photo counts.
 
 ## Structure board
 Lists the 4 bridges, 32 culverts, 13 junction culverts and 3 RS walls from the SDR `setup.json`, with state (*Active* in the last 7 days, *Recorded*, *No record*), last activity and status, number of records and photos.

@@ -86,7 +86,7 @@ const xml=(s)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':
 const canvasBlob=(cv,type='image/png',quality)=>new Promise((res,rej)=>{ try{ cv.toBlob(b=>b?res(b):rej(new Error('The browser returned an empty image.')),type,quality); }catch(e){ rej(e); } });
 
 export function makeMap(ctx){
-  const { S, $, drawer, resolveRange, inRange, MS, openReport, saveLS, render } = ctx;
+  const { S, $, drawer, resolveRange, inRange, MS, openReport, saveLS, render, openEvidence } = ctx;
   const P=()=>({...PROJECT,...(S.settings.project||{})});
   const M={ kmz:null, project:null, geo:null, map:null, layers:{}, base:'osm', show:{line:true,chain:true,poi:true,row:false,pins:true,coverage:false,gpsWarnings:true}, cat:'', who:'', view:null, groups:[], stat:{}, loaded:false, chFrom:null, chTo:null, dragMode:false, dragStart:null, snapshot:null, pendingMatrix:false };
   const kmzKey=()=>`kmz:${(S.settings.ws&&S.settings.ws.id)||'default'}`;
@@ -188,6 +188,7 @@ export function makeMap(ctx){
      <div id="mpMap" style="position:relative;z-index:0;isolation:isolate;height:600px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#dfe5e8"></div><div class="sub" id="mpInfo" style="margin-top:8px"></div>
      <div id="mpLg" style="margin-top:4px;font-size:12.5px"></div>${navigator.onLine===false?'<p class="sub">You appear to be offline: the basemap needs internet, the alignment and pins still show.</p>':''}</div>`;
     $('#mpK').onclick=()=>$('#mpF').click();
+    if(openEvidence){const tools=document.createElement('div');tools.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:10px 0';tools.innerHTML='<button class="btn" id="mpScopedStats">Share filtered statistics…</button><button class="btn" id="mpScopedReport">Report for this range…</button>';$('#mpMap').before(tools);const scope=()=>({...resolveRange(),categories:M.cat?[M.cat]:[],reporters:M.who?[M.who]:[],chFrom:M.chFrom,chTo:M.chTo});$('#mpScopedStats').onclick=()=>openEvidence({kind:'statistics',scope:scope(),title:'Selected map range'});$('#mpScopedReport').onclick=()=>openEvidence({kind:'report',scope:scope(),title:'Works in selected map range'});}
     $('#mpF').onchange=async(e)=>{ const f=e.target.files[0]; if(!f) return; $('#mpSt').textContent='Reading '+f.name+'…'; try{ await loadFile(f); M.view=null; render(); }catch(er){ $('#mpSt').textContent='Could not read the file: '+er.message; } };
     const fg=$('#mpFg'); if(fg) fg.onclick=async()=>{ await dbDel('meta',kmzKey()); M.kmz=null; M.view=null; useProjectGeometry(true); render(); };
     try{ await ensureLeaflet(); }catch(e){ $('#mpMap').innerHTML='<p class="sub" style="padding:20px">The map library could not be loaded ('+esc(e.message)+').</p>'; return; }
