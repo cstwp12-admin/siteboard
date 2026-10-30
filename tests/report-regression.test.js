@@ -8,7 +8,8 @@ const status=document.querySelector('#status'), out=document.querySelector('#out
 try{
   const index=await fetch(src); if(!index.ok) throw new Error(`Report folder returned HTTP ${index.status}`);
   const html=await index.text(), dom=new DOMParser().parseFromString(html,'text/html');
-  const urls=[...dom.querySelectorAll('a[href]')].map(a=>new URL(a.getAttribute('href'),new URL(src,location.href))).filter(u=>/\.pdf$/i.test(u.pathname));
+  const through=(q.get('through')||'').replace(/-/g,'');
+  const urls=[...dom.querySelectorAll('a[href]')].map(a=>new URL(a.getAttribute('href'),new URL(src,location.href))).filter(u=>{if(!/\.pdf$/i.test(u.pathname))return false;const date=(decodeURIComponent(u.pathname).match(/-(\d{8})-\d/)||[])[1];return !through||(date&&date<=through);});
   if(!urls.length) throw new Error('No PDF links were found in the report folder');
   const reports=[],errors=[];
   for(let i=0;i<urls.length;i++){

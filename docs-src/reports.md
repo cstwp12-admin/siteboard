@@ -19,6 +19,8 @@ A **logo** can be added to the cover in Settings. The report is generated on you
 ## Sharing the matrix and overview
 - On *Submissions* press **Share / save matrix…**; on *Overview* press **Share / save overview…**. A preview image is made for the period chosen at the top of the page. **Share matrix + map…** opens the Map and combines the matrix with the current map view and filters.
 - The description is written for you (period, compliance, who has no report on which days) and can be edited. Choose **Send via WhatsApp**, **Download image** (PNG), **Download PDF** or **Copy image**.
+- The full selected period is retained. For more than 62 days, the matrix is divided into date-labelled pages of up to 31 days. Preview and PDF include every page; image download and WhatsApp prepare all image pages. **Copy first page** copies only the first page when there are several. A matrix plus map share adds the map after the matrix pages.
+- PDF exports preserve the image proportions and split tall images across pages when necessary. The accompanying description is included in full on separate PDF pages.
 - On a computer WhatsApp cannot receive the image from a web page: SiteBoard downloads it and opens WhatsApp, and you attach it with the paperclip (or paste it if you used *Copy image*).
 
 ## Opening, commenting and sending

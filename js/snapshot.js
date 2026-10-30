@@ -4,6 +4,25 @@ import { PROJECT, CAT_ORDER, CAT_COLORS, VERSION } from './config.js';
 import { esc, setPrint, catColor, dayColumns, hbar, strip } from './charts.js';
 import { T, hex, clean, rasterize, loadPdfLibs } from './theme.js';
 import { sendWhatsApp } from './messages.js';
+import { addImagePages, textBlock } from './share-layout.js';
+
+export function snapshotData(reports,{from,to},settings,t){
+  const reps=reports.filter(r=>r.date>=from&&r.date<=to),days=A.dateRange(from,to);
+  return {from,to,t,reps,days,mx:A.matrix(reps,days,settings,t)};
+}
+export function matrixPages(d){
+  if(d.days.length<=62)return [d];
+  const pages=[];
+  for(let i=0;i<d.days.length;i+=31){
+    const days=d.days.slice(i,i+31),rows=d.mx.rows.map(r=>{
+      const cells=r.cells.slice(i,i+31),expected=cells.filter(c=>r.p.expected&&c.work&&c.past&&!c.ex);
+      return {...r,cells,e:expected.length,g:expected.filter(c=>c.rs.length).length,tot:cells.reduce((n,c)=>n+c.rs.length,0)};
+    });
+    const exp=rows.reduce((n,r)=>n+r.e,0),got=rows.reduce((n,r)=>n+r.g,0);
+    pages.push({...d,from:days[0],to:days.at(-1),days,reps:d.reps.filter(r=>r.date>=days[0]&&r.date<=days.at(-1)),mx:{rows,exp,got,rate:exp?got/exp:null}});
+  }
+  return pages;
+}
 
 const X=(s)=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pct=(x)=>x==null?'–':Math.round(x*100)+'%';
@@ -15,19 +34,17 @@ export function makeSnapshot(ctx){
   const P=()=>({...PROJECT,...(S.settings.project||{})});
   const today=()=>A.iso(new Date());
   let mapProvider=null;
+  function headerHeight(w){const p=P();return Math.max(64,Math.max(textBlock((p.consultant||'SITEBOARD').toUpperCase(),{width:w*.42,size:11,lineHeight:13,weight:'bold'}).height,textBlock(p.subtitle||p.title,{width:w*.5-24,size:11,lineHeight:13}).height)+40);}
 
   function header(w,title,sub){
-    const p=P();
-    return `<rect width="${w}" height="64" fill="${T.navy}"/><rect y="64" width="${w}" height="4" fill="${T.accent2}"/>
-     <text x="24" y="28" font-size="12" font-weight="700" fill="#F2B79B" letter-spacing="1.5">${X((p.consultant||'SITEBOARD').toUpperCase())}</text>
-     <text x="24" y="50" font-size="17" font-weight="700" fill="#fff">${X(title)}</text>
-     <text x="${w-24}" y="30" font-size="12" fill="#fff" text-anchor="end">${X(p.subtitle||p.title)}</text><text x="${w-24}" y="50" font-size="12" fill="#C9D3DA" text-anchor="end">${X(sub)}</text>`;
+    const p=P(),h=headerHeight(w);
+    return `<rect width="${w}" height="${h}" fill="${T.navy}"/><rect y="${h}" width="${w}" height="4" fill="${T.accent2}"/>
+     ${textBlock((p.consultant||'SITEBOARD').toUpperCase(),{x:24,y:20,width:w*.42,size:11,lineHeight:13,color:'#F2B79B',weight:'bold'}).svg}
+     <text x="24" y="${h-14}" font-size="17" font-weight="700" fill="#fff">${X(title)}</text>
+     ${textBlock(p.subtitle||p.title,{x:w-24,y:18,width:w*.5-24,size:11,lineHeight:13,color:'#fff',anchor:'end'}).svg}<text x="${w-24}" y="${h-14}" font-size="12" fill="#C9D3DA" text-anchor="end">${X(sub)}</text>`;
   }
   function data(){
-    const {from,to}=resolveRange(); const t=today(); const reps=inRange();
-    let days=A.dateRange(from,to); if(days.length>62) days=days.slice(-62);
-    const mx=A.matrix(S.reports.filter(r=>r.date>=days[0]&&r.date<=days.at(-1)),days,S.settings,t);
-    return {from:days[0],to:days.at(-1),t,reps,days,mx};
+    return snapshotData(S.reports,resolveRange(),S.settings,today());
   }
 
   // ---------------------------------------------------------------- matrix image
@@ -35,9 +52,9 @@ export function makeSnapshot(ctx){
     const {days,mx}=d; const cw=days.length<=16?36:days.length<=31?27:16, rh=26, nameW=230, totW=96; const W=Math.max(nameW+days.length*cw+totW+48,780);
     const leg=[['#E3F3EA','Report received (number = reports that day)'],['#FBE4E1','No report: expected person, working day (x)'],['#EEF1F3','Non-working day / no report needed (-)'],['#fff','* not expected to report daily']];
     const legPos=[]; { let lx=24,ln=0; for(const [c,t] of leg){ const w=17+t.length*6.4+26; if(lx+w>W-24&&lx>24){ lx=24; ln++; } legPos.push([lx,ln]); lx+=w; } var legLines=ln+1; }
-    const top=68+60; const rows=mx.rows; const H=top+(rows.length+2)*rh+54+legLines*18;
+    const top=headerHeight(W)+64; const rows=mx.rows; const H=top+(rows.length+2)*rh+54+legLines*18;
     let s=`<svg viewBox="0 0 ${W} ${H}" width="100%"><rect width="${W}" height="${H}" fill="#fff"/>`+header(W,'Submission matrix',`${A.fmtDate(d.from)} – ${A.fmtDate(d.to)}`);
-    s+=`<text x="24" y="96" font-size="13" fill="${T.muted}">Overall compliance</text><text x="160" y="97" font-size="20" font-weight="700" fill="${mx.rate==null?T.ink:mx.rate>=.9?'#1b7f4b':mx.rate>=.7?'#b36b00':'#c23a2e'}">${pct(mx.rate)}</text><text x="220" y="96" font-size="13" fill="${T.muted}">${mx.exp?`${mx.got} of ${mx.exp} expected daily reports`:'no expected reports'}</text>`;
+    s+=`<text x="24" y="${top-32}" font-size="13" fill="${T.muted}">Overall compliance</text><text x="160" y="${top-31}" font-size="20" font-weight="700" fill="${mx.rate==null?T.ink:mx.rate>=.9?'#1b7f4b':mx.rate>=.7?'#b36b00':'#c23a2e'}">${pct(mx.rate)}</text><text x="220" y="${top-32}" font-size="13" fill="${T.muted}">${mx.exp?`${mx.got} of ${mx.exp} expected daily reports`:'no expected reports'}</text>`;
     const x0=24+nameW;
     days.forEach((dd,i)=>{ const x=x0+i*cw; const off=!A.isWorkDay(dd,S.settings);
       s+=`<text x="${x+cw/2}" y="${top-14}" font-size="${cw<20?9:11}" text-anchor="middle" fill="${off?'#97A5AF':T.ink}" font-weight="600">${A.fromIso(dd).getDate()}</text><text x="${x+cw/2}" y="${top-3}" font-size="9" text-anchor="middle" fill="${T.muted}">${A.DOW[A.dow(dd)].slice(0,2)}</text>`; });
@@ -73,7 +90,7 @@ export function makeSnapshot(ctx){
       const dayData=new Map(); for(const r of rows){ const q=dayData.get(r.date)||{}; q[r.cat]=(q[r.cat]||0)+1; dayData.set(r.date,q); }
       const used=CAT_ORDER.filter(c=>rows.some(r=>r.cat===c)); const W=1100+48;
       const kp=[[reps.length,'Reports received'],[rows.length,'Work items photographed'],[pct(mx.rate),'Reporting compliance'],[`${wc} / ${wdays.length}`,'Working days with a report'],[(A.coveredLength(bins)/1000).toFixed(1)+' km','Alignment covered'],[wx.filter(w=>w.rain).length,'Rain days']];
-      let y=96, s=''; const kw=(W-48-5*10)/6;
+      let y=headerHeight(W)+32, s=''; const kw=(W-48-5*10)/6;
       kp.forEach(([v,l],i)=>{ const x=24+i*(kw+10); s+=`<rect x="${x}" y="${y}" width="${kw}" height="64" rx="8" fill="${T.bg}" stroke="${T.line}"/><rect x="${x}" y="${y}" width="4" height="64" fill="${T.accent2}"/><text x="${x+16}" y="${y+30}" font-size="24" font-weight="700" fill="${T.navy}">${X(v)}</text><text x="${x+16}" y="${y+51}" font-size="11" fill="${T.muted}">${X(l)}</text>`; });
       y+=84; s+=`<text x="24" y="${y}" font-size="14" font-weight="700" fill="${T.navy}">Work items photographed per day</text>`; y+=8;
       let n=nest(dayColumns(days,dayData,used,{w:1100,h:210}),24,y,W-48); s+=n.s; y+=n.h+6;
@@ -88,29 +105,33 @@ export function makeSnapshot(ctx){
   }
   function overviewText(d,o){
     const p=P(); const cats=A.count(o.rows,r=>r.cat).slice(0,4).map(([c,n])=>`${c} ${n}`).join(', ');
-    const L=[`*SITE OVERVIEW*  |  ${p.subtitle||p.title}`,`Period: ${A.fmtDate(d.from)} – ${A.fmtDate(d.to)}`,`Reports received: ${d.reps.length} from ${new Set(d.reps.map(r=>r.code)).size} personnel (${o.wc} of ${o.wdays.length} working days covered)`,`Reporting compliance: *${pct(d.mx.rate)}*${d.mx.exp?` (${d.mx.got} of ${d.mx.exp})`:''}`,`Work items photographed: ${o.rows.length}${cats?' – '+cats:''}`,`Alignment covered: ${(A.coveredLength(o.bins)/1000).toFixed(1)} km of 14.81 km`,`Rain days: ${o.wx.filter(w=>w.rain).length}${o.rfi.length?` · RFI referenced: ${o.rfi.length}`:''}`,'','Image attached.'];
+    const L=[`*SITE OVERVIEW*  |  ${p.subtitle||p.title}`,`Period: ${A.fmtDate(d.from)} – ${A.fmtDate(d.to)}`,`Reports received: ${d.reps.length} from ${new Set(d.reps.map(r=>r.code)).size} personnel (${o.wc} of ${o.wdays.length} working days covered)`,`Reporting compliance: *${pct(d.mx.rate)}*${d.mx.exp?` (${d.mx.got} of ${d.mx.exp})`:''}`,`Work items photographed: ${o.rows.length}${cats?' – '+cats:''}`,`Alignment covered: ${(A.coveredLength(o.bins)/1000).toFixed(1)} km of ${((A.ALIGN.end-A.ALIGN.start)/1000).toFixed(2)} km`,`Rain days: ${o.wx.filter(w=>w.rain).length}${o.rfi.length?` · RFI referenced: ${o.rfi.length}`:''}`,'','Image attached.'];
     return L.join('\n');
   }
 
   // ---------------------------------------------------------------- output
   async function build(kind){
-    const d=data(); let svg,text;
-    if(kind==='overview'){ const o=overviewSvg(d); svg=o.svg; text=overviewText(d,o); } else { svg=matrixSvg(d); text=matrixText(d); }
-    let img=await rasterize(svg,2), blob=await (await fetch(img.url)).blob();
+    const d=data(); let text; const images=[];
+    const parts=kind==='overview'?[d]:matrixPages(d);
+    for(const part of parts){let svg;if(kind==='overview'){const o=overviewSvg(part);svg=o.svg;text=overviewText(d,o);}else{svg=matrixSvg(part);text=matrixText(d);}const img=await rasterize(svg,2),blob=await (await fetch(img.url)).blob();images.push({img,blob});}
     if(kind==='matrix-map'){
-      if(!mapProvider) throw new Error('The map is not available.'); const map=await mapProvider.snapshotForShare(); const a=await createImageBitmap(blob), b=await createImageBitmap(map.blob), gap=24, pad=24, w=Math.max(a.width,b.width)+pad*2, h=a.height+b.height+gap+pad*2;
+      if(!mapProvider) throw new Error('The map is not available.'); const map=await mapProvider.snapshotForShare();
+      if(images.length===1){ const a=await createImageBitmap(images[0].blob), b=await createImageBitmap(map.blob), gap=24, pad=24, w=Math.max(a.width,b.width)+pad*2, h=a.height+b.height+gap+pad*2;
       const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const g=cv.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,w,h); g.drawImage(a,(w-a.width)/2,pad); g.drawImage(b,(w-b.width)/2,pad+a.height+gap); a.close&&a.close(); b.close&&b.close();
-      blob=await new Promise((res,rej)=>cv.toBlob(x=>x?res(x):rej(new Error('Could not combine the matrix and map.')),'image/png')); img={url:cv.toDataURL('image/png'),w,h}; text=matrixText(d).replace(/Image attached\.$/,'')+'\n\n'+map.text.replace(/^\*SITE PHOTO MAP\*[^\n]*\n?/,'').replace(/Map image attached\.$/,'')+'\n\nMatrix and map attached as one image.';
+      const blob=await new Promise((res,rej)=>cv.toBlob(x=>x?res(x):rej(new Error('Could not combine the matrix and map.')),'image/png')); images[0]={blob,img:{url:cv.toDataURL('image/png'),w,h}};
+      }else{images.push({blob:map.blob,img:{url:map.cv.toDataURL('image/png'),w:map.cv.width,h:map.cv.height}});}
+      text=matrixText(d).replace(/Image attached\.$/,'')+'\n\n'+map.text.replace(/^\*SITE PHOTO MAP\*[^\n]*\n?/,'').replace(/Map image attached\.$/,'')+'\n\nMatrix and map attached.';
     }
     const label=kind==='overview'?'overview':kind==='matrix-map'?'matrix and map':'matrix', nm=`SiteBoard ${label} ${d.from} to ${d.to}`;
-    return {d,img,blob,text,nm};
+    if(images.length>1)text+=`\n${images.length} image pages cover the selected period.`;
+    return {d,...images[0],images,text,nm};
   }
   async function pdfOf(r,kind){
     const {jsPDF}=await loadPdfLibs(); const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4',compress:true}); const W=297,H=210;
-    const lines=doc.splitTextToSize(clean(r.text.replace(/\*/g,'').replace(/_/g,'')),W-24);
-    const th=Math.min(lines.length,9)*3.6+4; const maxH=H-12-th-8; let w=W-20, h=w*r.img.h/r.img.w; if(h>maxH){ h=maxH; w=h*r.img.w/r.img.h; }
-    doc.addImage(r.img.url,'PNG',(W-w)/2,8,w,h,undefined,'FAST');
-    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(...hex(T.ink)); doc.text(lines.slice(0,9),12,8+h+7);
+    for(let i=0;i<r.images.length;i++){if(i)doc.addPage();await addImagePages(doc,r.images[i].img);}
+    doc.addPage();doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(...hex(T.ink));
+    const lines=doc.splitTextToSize(clean(r.text.replace(/\*/g,'').replace(/_/g,'')),W-24);let y=16;
+    for(const line of lines){if(y>H-16){doc.addPage();y=16;}doc.text(line,12,y);y+=4.8;}
     doc.setFontSize(7.5); doc.setTextColor(...hex(T.muted)); doc.text(clean(`Generated by SiteBoard v${VERSION} · ${A.fmtDate(today())}`),12,H-6); doc.setProperties({title:r.nm,creator:'SiteBoard v'+VERSION});
     return doc.output('blob');
   }
@@ -122,20 +143,22 @@ export function makeSnapshot(ctx){
     const phone=S.settings.waTo||'';
     drawer(`<h3>Share / save</h3><div class="frm"><label class="fld">Content<select id="snK"><option value="matrix" ${kind==='matrix'?'selected':''}>Submission matrix</option><option value="matrix-map" ${kind==='matrix-map'?'selected':''}>Submission matrix + map</option><option value="overview" ${kind==='overview'?'selected':''}>Overview</option></select></label></div>
      <p class="sub">Uses the period chosen at the top of the page (${A.fmtDate(r.d.from)} – ${A.fmtDate(r.d.to)}).</p>
-     <img src="${r.img.url}" alt="Preview" style="width:100%;border:1px solid var(--line);border-radius:8px;background:#fff">
+     ${r.images.map((p,i)=>`<p class="sub">${r.images.length>1?'Page '+(i+1)+' of '+r.images.length:''}</p><img src="${p.img.url}" alt="Preview page ${i+1}" style="width:100%;border:1px solid var(--line);border-radius:8px;background:#fff">`).join('')}
      <label class="fld" style="margin-top:10px">Description for WhatsApp (editable)<textarea id="snT" rows="9" style="width:100%;font-family:var(--mono,monospace);font-size:12.5px">${esc(r.text)}</textarea></label>
      <label class="fld" style="margin-top:8px">WhatsApp number (optional)<input id="snN" value="${esc(phone)}" placeholder="601XXXXXXXX (empty = choose in WhatsApp)"></label>
      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center"><button class="btn pri" id="snW">Send via WhatsApp</button><button class="btn" id="snP">Download image</button><button class="btn" id="snF">Download PDF</button><button class="btn" id="snC">Copy image</button><span class="sub" id="snMsg" style="margin:0;flex:1 1 200px"></span></div>`);
     $('#snK').onchange=(e)=>open(e.target.value);
     const shareType=kind==='overview'?'Overview':kind==='matrix-map'?'Matrix + map':'Matrix';
-    $('#snP').onclick=()=>{ save(r.nm+'.png',r.blob); S.ISS.record({kind:'Share',type:shareType,subject:r.nm,to:'(downloaded)'},{name:r.nm+'.png',blob:r.blob}); };
+    const files=r.images.map((p,i)=>({name:r.nm+(r.images.length>1?' page '+(i+1):'')+'.png',blob:p.blob}));
+    $('#snP').onclick=()=>{ files.forEach((f,i)=>setTimeout(()=>{save(f.name,f.blob);S.ISS.record({kind:'Share',type:shareType,subject:f.name,to:'(downloaded)'},f);},i*350)); };
     $('#snF').onclick=async()=>{ try{ const pb=await pdfOf(r,kind); save(r.nm+'.pdf',pb); S.ISS.record({kind:'Share',type:shareType,subject:r.nm,to:'(downloaded)'},{name:r.nm+'.pdf',blob:pb}); }catch(e){ $('#snMsg').textContent='Could not build PDF: '+e.message; } };
-    $('#snC').onclick=async()=>{ try{ await navigator.clipboard.write([new ClipboardItem({'image/png':r.blob})]); $('#snMsg').textContent='Image copied. Paste it into WhatsApp with Ctrl+V.'; }catch(_){ $('#snMsg').textContent='This browser cannot copy images. Use Download image.'; } };
+    $('#snC').textContent=r.images.length>1?'Copy first page':'Copy image';
+    $('#snC').onclick=async()=>{ try{ await navigator.clipboard.write([new ClipboardItem({'image/png':r.blob})]); $('#snMsg').textContent=r.images.length>1?'First page copied. Download images or PDF for all pages.':'Image copied. Paste it into WhatsApp with Ctrl+V.'; }catch(_){ $('#snMsg').textContent='This browser cannot copy images. Use Download image.'; } };
     $('#snW').onclick=async()=>{ const b=$('#snW'); b.disabled=true; const num=$('#snN').value; S.settings.waTo=num; ctx.saveLS();
-      try{ const res=await sendWhatsApp({text:$('#snT').value,files:[{name:r.nm+'.png',blob:r.blob}],phone:num}); $('#snMsg').textContent=res.msg;
-        if(res.mode!=='cancelled') S.ISS.record({kind:'Share',type:shareType,subject:r.nm,to:num||'(chosen in WhatsApp)'},{name:r.nm+'.png',blob:r.blob}); }catch(e){ $('#snMsg').textContent='Could not send: '+e.message; }
+      try{ const res=await sendWhatsApp({text:$('#snT').value,files,phone:num}); $('#snMsg').textContent=res.msg;
+        if(res.mode!=='cancelled') for(const f of files)S.ISS.record({kind:'Share',type:shareType,subject:f.name,to:num||'(chosen in WhatsApp)'},f); }catch(e){ $('#snMsg').textContent='Could not send: '+e.message; }
       b.disabled=false; };
   }
   const setMapProvider=(api)=>{ mapProvider=api; };
-  return { open, setMapProvider };
+  return { open, setMapProvider, build, pdfOf };
 }
